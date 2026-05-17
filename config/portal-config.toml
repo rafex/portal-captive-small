@@ -1,0 +1,44 @@
+[session]
+internet_ttl_seconds = 3600
+
+[registration]
+templates_enabled = ["hotel", "restaurante", "escuela", "casa", "personalizado"]
+fields_enabled = [
+  "nombres",
+  "apellidos",
+  "edad",
+  "correo_electronico",
+  "telefono",
+  "celular",
+  "direccion",
+  "facebook",
+  "instagram",
+  "tiktok",
+  "x",
+  "contrasena"
+]
+
+[login]
+allow_email = true
+allow_phone = true
+require_password = true
+
+[mqtt]
+host = "127.0.0.1"
+port = 1883
+topic_register = "portal/register"
+topic_login = "portal/login"
+
+[smtp]
+enabled = true
+host = "smtp.example.com"
+port = 587
+username = "user@example.com"
+from = "no-reply@example.com"
+use_starttls = true
+
+[openwrt]
+ssh_host = "192.168.1.1"
+ssh_port = 22
+ssh_user = "root"
+uci_firewall_zone = "lan"

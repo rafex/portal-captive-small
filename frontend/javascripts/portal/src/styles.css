@@ -1,0 +1,42 @@
+:root {
+  --bg: #f5f7fb;
+  --fg: #1b1f24;
+  --panel: #ffffff;
+  --accent: #0f766e;
+}
+
+body {
+  margin: 0;
+  font-family: "Verdana", sans-serif;
+  background: radial-gradient(circle at top, #e9f8f5, var(--bg));
+  color: var(--fg);
+}
+
+.portal {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+section {
+  background: var(--panel);
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+input,
+select,
+button {
+  display: block;
+  width: 100%;
+  margin: 0.4rem 0;
+  padding: 0.55rem;
+}
+
+button {
+  background: var(--accent);
+  border: 0;
+  color: #fff;
+  cursor: pointer;
+}

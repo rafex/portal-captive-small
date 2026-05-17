@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Portal Cautivo</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <main class="portal">
+      <h1>Portal Cautivo</h1>
+      <section>
+        <h2>Iniciar sesión</h2>
+        <form id="login-form">
+          <input name="identifier" placeholder="Correo o teléfono" required />
+          <input name="password" type="password" placeholder="Contraseña" required />
+          <button type="submit">Entrar</button>
+        </form>
+      </section>
+      <section>
+        <h2>Registro</h2>
+        <form id="register-form">
+          <select name="template" required>
+            <option value="hotel">hotel</option>
+            <option value="restaurante">restaurante</option>
+            <option value="escuela">escuela</option>
+            <option value="casa">casa</option>
+            <option value="personalizado">personalizado</option>
+          </select>
+          <input name="nombres" placeholder="Nombres" required />
+          <input name="apellidos" placeholder="Apellidos" required />
+          <input name="correo" type="email" placeholder="Correo" required />
+          <button type="submit">Registrarme</button>
+        </form>
+      </section>
+    </main>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

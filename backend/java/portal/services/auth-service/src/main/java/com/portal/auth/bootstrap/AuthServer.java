@@ -8,6 +8,7 @@ import com.portal.auth.adapter.out.notifications.MosquittoAsyncPublisher;
 import com.portal.auth.adapter.out.notifications.Sha256PasswordHasher;
 import com.portal.auth.adapter.out.notifications.SmtpSocketEmailSender;
 import com.portal.auth.adapter.out.sqlite.SqliteCliUserRepository;
+import com.portal.auth.application.port.out.AsyncEventPublisher;
 import com.portal.auth.application.port.out.UserRepository;
 import com.portal.auth.application.service.AuthService;
 import com.portal.auth.config.PortalConfig;
@@ -26,11 +27,12 @@ public final class AuthServer {
     public static void run(Path configPath) throws IOException {
         PortalConfig config = PortalConfig.fromToml(configPath);
         UserRepository repository = buildRepository(config);
+        AsyncEventPublisher publisher = new MosquittoAsyncPublisher(config.mqttHost(), config.mqttPort());
 
         AuthService service = new AuthService(
                 repository,
                 new Sha256PasswordHasher(),
-                new MosquittoAsyncPublisher(config.mqttHost(), config.mqttPort()),
+                publisher,
                 new SmtpSocketEmailSender(config.smtpHost(), config.smtpPort(), config.smtpFrom()),
                 new SshOpenWrtAccessGateway(config.openWrtHost(), config.openWrtPort(), config.openWrtUser()),
                 config.sessionTtlSeconds()
@@ -42,9 +44,13 @@ public final class AuthServer {
                 config.mqttTopicRegister(),
                 config.mqttTopicLogin(),
                 config.mqttTopicIssuePassword(),
+                config.mqttTopicRegisterOut(),
+                config.mqttTopicLoginOut(),
+                config.mqttTopicIssuePasswordOut(),
                 service,
                 service,
-                service
+                service,
+                publisher
         );
         commandConsumer.start();
 

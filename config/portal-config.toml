@@ -36,6 +36,9 @@ port = 1883
 topic_register = "portal/register/in"
 topic_login = "portal/login/in"
 topic_issue_password = "portal/password/issue/in"
+topic_register_out = "portal/register/out"
+topic_login_out = "portal/login/out"
+topic_issue_password_out = "portal/password/issue/out"
 
 [smtp]
 enabled = true

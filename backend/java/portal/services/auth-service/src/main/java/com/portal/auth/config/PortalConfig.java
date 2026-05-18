@@ -20,6 +20,9 @@ public record PortalConfig(
         String mqttTopicRegister,
         String mqttTopicLogin,
         String mqttTopicIssuePassword,
+        String mqttTopicRegisterOut,
+        String mqttTopicLoginOut,
+        String mqttTopicIssuePasswordOut,
         String userRepositoryType,
         String sqliteDbPath
 ) {
@@ -37,6 +40,9 @@ public record PortalConfig(
         String mqttTopicRegister = "portal/register/in";
         String mqttTopicLogin = "portal/login/in";
         String mqttTopicIssuePassword = "portal/password/issue/in";
+        String mqttTopicRegisterOut = "portal/register/out";
+        String mqttTopicLoginOut = "portal/login/out";
+        String mqttTopicIssuePasswordOut = "portal/password/issue/out";
         String userRepositoryType = "sqlite";
         String sqliteDbPath = "data/auth-service.db";
         String section = "";
@@ -73,12 +79,18 @@ public record PortalConfig(
                     mqttHost = parseString(l);
                 } else if ("mqtt".equals(section) && l.startsWith("port")) {
                     mqttPort = parseInt(l);
-                } else if ("mqtt".equals(section) && l.startsWith("topic_register")) {
+                } else if ("mqtt".equals(section) && l.startsWith("topic_register =")) {
                     mqttTopicRegister = parseString(l);
-                } else if ("mqtt".equals(section) && l.startsWith("topic_login")) {
+                } else if ("mqtt".equals(section) && l.startsWith("topic_login =")) {
                     mqttTopicLogin = parseString(l);
-                } else if ("mqtt".equals(section) && l.startsWith("topic_issue_password")) {
+                } else if ("mqtt".equals(section) && l.startsWith("topic_issue_password =")) {
                     mqttTopicIssuePassword = parseString(l);
+                } else if ("mqtt".equals(section) && l.startsWith("topic_register_out =")) {
+                    mqttTopicRegisterOut = parseString(l);
+                } else if ("mqtt".equals(section) && l.startsWith("topic_login_out =")) {
+                    mqttTopicLoginOut = parseString(l);
+                } else if ("mqtt".equals(section) && l.startsWith("topic_issue_password_out =")) {
+                    mqttTopicIssuePasswordOut = parseString(l);
                 } else if ("repository".equals(section) && l.startsWith("type")) {
                     userRepositoryType = parseString(l);
                 } else if ("repository".equals(section) && l.startsWith("sqlite_db_path")) {
@@ -91,7 +103,9 @@ public record PortalConfig(
         return new PortalConfig(
                 httpPort, sessionTtlSeconds, smtpHost, smtpPort, smtpFrom,
                 openWrtHost, openWrtPort, openWrtUser,
-                mqttHost, mqttPort, mqttTopicRegister, mqttTopicLogin, mqttTopicIssuePassword,
+                mqttHost, mqttPort,
+                mqttTopicRegister, mqttTopicLogin, mqttTopicIssuePassword,
+                mqttTopicRegisterOut, mqttTopicLoginOut, mqttTopicIssuePasswordOut,
                 userRepositoryType, sqliteDbPath
         );
     }

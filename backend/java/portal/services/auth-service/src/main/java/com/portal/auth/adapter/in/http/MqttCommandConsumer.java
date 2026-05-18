@@ -2,9 +2,11 @@ package com.portal.auth.adapter.in.http;
 
 import com.portal.auth.application.port.in.IssuePasswordUseCase;
 import com.portal.auth.application.port.in.LoginCommand;
+import com.portal.auth.application.port.in.LoginResult;
 import com.portal.auth.application.port.in.LoginUseCase;
 import com.portal.auth.application.port.in.RegisterUserCommand;
 import com.portal.auth.application.port.in.RegisterUserUseCase;
+import com.portal.auth.application.port.out.AsyncEventPublisher;
 import com.portal.auth.shared.SimpleJson;
 
 import java.io.BufferedReader;
@@ -13,6 +15,7 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Map;
+import java.util.UUID;
 
 public final class MqttCommandConsumer {
     private final String host;
@@ -20,26 +23,38 @@ public final class MqttCommandConsumer {
     private final String registerTopic;
     private final String loginTopic;
     private final String issuePasswordTopic;
+    private final String registerOutTopic;
+    private final String loginOutTopic;
+    private final String issuePasswordOutTopic;
     private final RegisterUserUseCase registerUserUseCase;
     private final LoginUseCase loginUseCase;
     private final IssuePasswordUseCase issuePasswordUseCase;
+    private final AsyncEventPublisher asyncEventPublisher;
 
     public MqttCommandConsumer(String host,
                                int port,
                                String registerTopic,
                                String loginTopic,
                                String issuePasswordTopic,
+                               String registerOutTopic,
+                               String loginOutTopic,
+                               String issuePasswordOutTopic,
                                RegisterUserUseCase registerUserUseCase,
                                LoginUseCase loginUseCase,
-                               IssuePasswordUseCase issuePasswordUseCase) {
+                               IssuePasswordUseCase issuePasswordUseCase,
+                               AsyncEventPublisher asyncEventPublisher) {
         this.host = host;
         this.port = port;
         this.registerTopic = registerTopic;
         this.loginTopic = loginTopic;
         this.issuePasswordTopic = issuePasswordTopic;
+        this.registerOutTopic = registerOutTopic;
+        this.loginOutTopic = loginOutTopic;
+        this.issuePasswordOutTopic = issuePasswordOutTopic;
         this.registerUserUseCase = registerUserUseCase;
         this.loginUseCase = loginUseCase;
         this.issuePasswordUseCase = issuePasswordUseCase;
+        this.asyncEventPublisher = asyncEventPublisher;
     }
 
     public void start() {
@@ -85,8 +100,13 @@ public final class MqttCommandConsumer {
     }
 
     private void handleRegister(String payload) {
+        Map<String, String> json = safeParse(payload, registerOutTopic);
+        if (json == null) {
+            return;
+        }
+        String requestId = requestId(json);
+
         try {
-            Map<String, String> json = SimpleJson.parseFlatObject(payload);
             RegisterUserCommand command = new RegisterUserCommand(
                     json.get("template"),
                     json.get("firstName"),
@@ -102,28 +122,68 @@ public final class MqttCommandConsumer {
                     json.get("socialX"),
                     json.get("password")
             );
-            registerUserUseCase.register(command);
+            String userId = registerUserUseCase.register(command);
+            publishOk(registerOutTopic, requestId, "{\"userId\":\"" + userId + "\"}");
         } catch (Exception e) {
-            System.err.println("mqtt_register_payload_error: " + e.getMessage());
+            publishError(registerOutTopic, requestId, e.getMessage());
         }
     }
 
     private void handleLogin(String payload) {
+        Map<String, String> json = safeParse(payload, loginOutTopic);
+        if (json == null) {
+            return;
+        }
+        String requestId = requestId(json);
+
         try {
-            Map<String, String> json = SimpleJson.parseFlatObject(payload);
-            loginUseCase.login(new LoginCommand(json.get("identifier"), json.get("password")));
+            LoginResult result = loginUseCase.login(new LoginCommand(json.get("identifier"), json.get("password")));
+            String data = "{\"authenticated\":" + result.authenticated() +
+                    ",\"userId\":\"" + safe(result.userId()) +
+                    "\",\"reason\":\"" + safe(result.reason()) + "\"}";
+            publishOk(loginOutTopic, requestId, data);
         } catch (Exception e) {
-            System.err.println("mqtt_login_payload_error: " + e.getMessage());
+            publishError(loginOutTopic, requestId, e.getMessage());
         }
     }
 
     private void handleIssuePassword(String payload) {
-        try {
-            Map<String, String> json = SimpleJson.parseFlatObject(payload);
-            issuePasswordUseCase.issueTemporaryPassword(json.get("email"));
-        } catch (Exception e) {
-            System.err.println("mqtt_issue_password_payload_error: " + e.getMessage());
+        Map<String, String> json = safeParse(payload, issuePasswordOutTopic);
+        if (json == null) {
+            return;
         }
+        String requestId = requestId(json);
+
+        try {
+            issuePasswordUseCase.issueTemporaryPassword(json.get("email"));
+            publishOk(issuePasswordOutTopic, requestId, "{\"status\":\"queued\"}");
+        } catch (Exception e) {
+            publishError(issuePasswordOutTopic, requestId, e.getMessage());
+        }
+    }
+
+    private Map<String, String> safeParse(String payload, String outTopic) {
+        try {
+            return SimpleJson.parseFlatObject(payload);
+        } catch (Exception e) {
+            publishError(outTopic, UUID.randomUUID().toString(), "invalid_json");
+            return null;
+        }
+    }
+
+    private String requestId(Map<String, String> json) {
+        String value = json.get("requestId");
+        return (value == null || value.isBlank()) ? UUID.randomUUID().toString() : value;
+    }
+
+    private void publishOk(String topic, String requestId, String dataJson) {
+        asyncEventPublisher.publish(topic,
+                "{\"requestId\":\"" + safe(requestId) + "\",\"status\":\"ok\",\"data\":" + dataJson + "}");
+    }
+
+    private void publishError(String topic, String requestId, String message) {
+        asyncEventPublisher.publish(topic,
+                "{\"requestId\":\"" + safe(requestId) + "\",\"status\":\"error\",\"error\":\"" + safe(message) + "\"}");
     }
 
     private static Integer parseInt(String raw) {
@@ -131,6 +191,13 @@ public final class MqttCommandConsumer {
             return null;
         }
         return Integer.parseInt(raw);
+    }
+
+    private static String safe(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.replace("\"", "'");
     }
 
     @FunctionalInterface

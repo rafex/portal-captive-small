@@ -1,0 +1,15 @@
+# Java
+**/target/
+
+# Node
+**/node_modules/
+**/dist/
+
+# Rust
+**/target/
+
+# Build output
+dist/
+
+# OS
+.DS_Store

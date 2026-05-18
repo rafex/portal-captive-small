@@ -4,7 +4,7 @@ Portal cautivo ultraligero para Raspberry Pi 3B, orientado a despliegue reproduc
 
 ## Stack objetivo
 - Frontend: Vite + HTML + CSS + JavaScript puro
-- Backend: Java 21, Maven, arquitectura hexagonal, compilación con GraalVM
+- Backend: Java 21 (solo bibliotecas estándar JDK, sin frameworks), Maven, arquitectura hexagonal
 - Persistencia: SQLite por microservicio
 - Módulo nativo: Rust `.so` para acceso SQLite
 - Mensajería asíncrona: MQTT (Mosquitto)

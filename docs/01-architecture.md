@@ -15,19 +15,21 @@ Ruta: `frontend/javascripts/portal`
 ## Backend Java (hexagonal)
 Ruta: `backend/java/portal`
 - `portal-parent` como POM padre.
-- Puertos de entrada: REST/MQTT consumers.
+- Implementación Java con bibliotecas estándar del JDK únicamente.
+- Puertos de entrada: REST (HTTP nativo JDK) y consumidores MQTT.
 - Puertos de salida: repositorios SQLite, SMTP, OpenWrt adapter.
 - Adaptadores infraestructura: HTTP, MQTT, SQLite bridge (`.so`), SSH/UCI.
 
 ## Módulo Rust SQLite
 Ruta: `backend/rust/database-conector-sqlite`
 - Biblioteca `cdylib` para exponer funciones C ABI/JNI-friendly.
-- Objetivo: encapsular acceso SQLite para reducir problemas de dependencia en native-image.
+- Objetivo: encapsular acceso SQLite para reducir fricción de dependencias nativas.
 
 ## Asincronía y concurrencia
 - Mosquitto como broker ligero.
 - Frontend publica eventos de sesión/registro.
 - Backend procesa eventos y emite respuestas/eventos de estado.
+- En Java, publicación MQTT desacoplada por cola interna para no bloquear el request path.
 
 ## Integración OpenWrt
 - Adapter SSH ejecuta comandos UCI para altas/bajas de reglas temporales.

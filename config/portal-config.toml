@@ -1,5 +1,12 @@
+[server]
+http_port = 8080
+
 [session]
 internet_ttl_seconds = 3600
+
+[repository]
+type = "sqlite"
+sqlite_db_path = "data/auth-service.db"
 
 [registration]
 templates_enabled = ["hotel", "restaurante", "escuela", "casa", "personalizado"]

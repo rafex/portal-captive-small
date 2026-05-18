@@ -6,5 +6,12 @@ edition = "2021"
 [lib]
 crate-type = ["cdylib"]
 
+[[bin]]
+name = "db-mqtt-worker"
+path = "src/main.rs"
+
 [dependencies]
 rusqlite = { version = "0.31", features = ["bundled"] }
+rumqttc = "0.24"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

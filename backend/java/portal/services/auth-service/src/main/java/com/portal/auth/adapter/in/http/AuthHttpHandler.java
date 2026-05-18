@@ -1,0 +1,117 @@
+package com.portal.auth.adapter.in.http;
+
+import com.portal.auth.application.port.in.IssuePasswordUseCase;
+import com.portal.auth.application.port.in.LoginCommand;
+import com.portal.auth.application.port.in.LoginResult;
+import com.portal.auth.application.port.in.LoginUseCase;
+import com.portal.auth.application.port.in.RegisterUserCommand;
+import com.portal.auth.application.port.in.RegisterUserUseCase;
+import com.portal.auth.shared.SimpleJson;
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpHandler;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.Map;
+
+public final class AuthHttpHandler implements HttpHandler {
+    private final RegisterUserUseCase registerUserUseCase;
+    private final LoginUseCase loginUseCase;
+    private final IssuePasswordUseCase issuePasswordUseCase;
+
+    public AuthHttpHandler(RegisterUserUseCase registerUserUseCase,
+                           LoginUseCase loginUseCase,
+                           IssuePasswordUseCase issuePasswordUseCase) {
+        this.registerUserUseCase = registerUserUseCase;
+        this.loginUseCase = loginUseCase;
+        this.issuePasswordUseCase = issuePasswordUseCase;
+    }
+
+    @Override
+    public void handle(HttpExchange exchange) throws IOException {
+        String path = exchange.getRequestURI().getPath();
+        String method = exchange.getRequestMethod();
+
+        try {
+            if ("/health".equals(path) && "GET".equals(method)) {
+                writeJson(exchange, 200, "{\"status\":\"ok\"}");
+                return;
+            }
+            if ("/auth/register".equals(path) && "POST".equals(method)) {
+                register(exchange);
+                return;
+            }
+            if ("/auth/login".equals(path) && "POST".equals(method)) {
+                login(exchange);
+                return;
+            }
+            if ("/auth/password/issue".equals(path) && "POST".equals(method)) {
+                issuePassword(exchange);
+                return;
+            }
+            writeJson(exchange, 404, "{\"error\":\"not_found\"}");
+        } catch (IllegalArgumentException e) {
+            writeJson(exchange, 400, "{\"error\":\"" + e.getMessage() + "\"}");
+        } catch (Exception e) {
+            writeJson(exchange, 500, "{\"error\":\"internal_error\"}");
+        }
+    }
+
+    private void register(HttpExchange exchange) throws IOException {
+        String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+        Map<String, String> json = SimpleJson.parseFlatObject(body);
+        RegisterUserCommand command = new RegisterUserCommand(
+                json.get("firstName"),
+                json.get("lastName"),
+                parseInt(json.get("age")),
+                json.get("email"),
+                json.get("phone"),
+                json.get("mobile"),
+                json.get("address"),
+                json.get("socialFacebook"),
+                json.get("socialInstagram"),
+                json.get("socialTiktok"),
+                json.get("socialX"),
+                json.get("password")
+        );
+        String userId = registerUserUseCase.register(command);
+        writeJson(exchange, 201, "{\"userId\":\"" + userId + "\"}");
+    }
+
+    private void login(HttpExchange exchange) throws IOException {
+        String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+        Map<String, String> json = SimpleJson.parseFlatObject(body);
+        LoginResult result = loginUseCase.login(new LoginCommand(json.get("identifier"), json.get("password")));
+        int status = result.authenticated() ? 200 : 401;
+        writeJson(exchange, status,
+                "{\"authenticated\":" + result.authenticated() +
+                        ",\"userId\":\"" + safe(result.userId()) +
+                        "\",\"reason\":\"" + result.reason() + "\"}");
+    }
+
+    private void issuePassword(HttpExchange exchange) throws IOException {
+        String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+        Map<String, String> json = SimpleJson.parseFlatObject(body);
+        issuePasswordUseCase.issueTemporaryPassword(json.get("email"));
+        writeJson(exchange, 202, "{\"status\":\"queued\"}");
+    }
+
+    private static Integer parseInt(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        return Integer.parseInt(raw);
+    }
+
+    private static String safe(String value) {
+        return value == null ? "" : value;
+    }
+
+    private static void writeJson(HttpExchange exchange, int status, String body) throws IOException {
+        byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+        exchange.getResponseHeaders().add("Content-Type", "application/json; charset=utf-8");
+        exchange.sendResponseHeaders(status, bytes.length);
+        exchange.getResponseBody().write(bytes);
+        exchange.close();
+    }
+}

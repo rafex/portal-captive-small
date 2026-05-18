@@ -11,6 +11,8 @@
 # Build output
 dist/
 
+# Local runtime data
+**/*.db
+
 # OS
 .DS_Store
-data/

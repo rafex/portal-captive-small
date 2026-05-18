@@ -29,8 +29,15 @@ public final class AuthHttpHandler implements HttpHandler {
 
     @Override
     public void handle(HttpExchange exchange) throws IOException {
+        addCors(exchange);
         String path = exchange.getRequestURI().getPath();
         String method = exchange.getRequestMethod();
+
+        if ("OPTIONS".equals(method)) {
+            exchange.sendResponseHeaders(204, -1);
+            exchange.close();
+            return;
+        }
 
         try {
             if ("/health".equals(path) && "GET".equals(method)) {
@@ -61,6 +68,7 @@ public final class AuthHttpHandler implements HttpHandler {
         String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
         Map<String, String> json = SimpleJson.parseFlatObject(body);
         RegisterUserCommand command = new RegisterUserCommand(
+                json.get("template"),
                 json.get("firstName"),
                 json.get("lastName"),
                 parseInt(json.get("age")),
@@ -96,6 +104,12 @@ public final class AuthHttpHandler implements HttpHandler {
         writeJson(exchange, 202, "{\"status\":\"queued\"}");
     }
 
+    private static void addCors(HttpExchange exchange) {
+        exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
+        exchange.getResponseHeaders().set("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+        exchange.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type");
+    }
+
     private static Integer parseInt(String raw) {
         if (raw == null || raw.isBlank()) {
             return null;
@@ -109,7 +123,7 @@ public final class AuthHttpHandler implements HttpHandler {
 
     private static void writeJson(HttpExchange exchange, int status, String body) throws IOException {
         byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
-        exchange.getResponseHeaders().add("Content-Type", "application/json; charset=utf-8");
+        exchange.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
         exchange.sendResponseHeaders(status, bytes.length);
         exchange.getResponseBody().write(bytes);
         exchange.close();

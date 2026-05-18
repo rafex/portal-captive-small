@@ -33,8 +33,9 @@ require_password = true
 [mqtt]
 host = "127.0.0.1"
 port = 1883
-topic_register = "portal/register"
-topic_login = "portal/login"
+topic_register = "portal/register/in"
+topic_login = "portal/login/in"
+topic_issue_password = "portal/password/issue/in"
 
 [smtp]
 enabled = true

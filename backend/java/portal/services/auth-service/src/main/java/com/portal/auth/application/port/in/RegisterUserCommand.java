@@ -1,6 +1,7 @@
 package com.portal.auth.application.port.in;
 
 public record RegisterUserCommand(
+        String template,
         String firstName,
         String lastName,
         Integer age,

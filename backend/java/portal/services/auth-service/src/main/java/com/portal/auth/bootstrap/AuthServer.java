@@ -1,6 +1,7 @@
 package com.portal.auth.bootstrap;
 
 import com.portal.auth.adapter.in.http.AuthHttpHandler;
+import com.portal.auth.adapter.in.http.MqttCommandConsumer;
 import com.portal.auth.adapter.out.memory.InMemoryUserRepository;
 import com.portal.auth.adapter.out.network.SshOpenWrtAccessGateway;
 import com.portal.auth.adapter.out.notifications.MosquittoAsyncPublisher;
@@ -34,6 +35,18 @@ public final class AuthServer {
                 new SshOpenWrtAccessGateway(config.openWrtHost(), config.openWrtPort(), config.openWrtUser()),
                 config.sessionTtlSeconds()
         );
+
+        MqttCommandConsumer commandConsumer = new MqttCommandConsumer(
+                config.mqttHost(),
+                config.mqttPort(),
+                config.mqttTopicRegister(),
+                config.mqttTopicLogin(),
+                config.mqttTopicIssuePassword(),
+                service,
+                service,
+                service
+        );
+        commandConsumer.start();
 
         HttpServer httpServer = HttpServer.create(new InetSocketAddress(config.httpPort()), 0);
         httpServer.createContext("/", new AuthHttpHandler(service, service, service));

@@ -17,6 +17,9 @@ public record PortalConfig(
         String openWrtUser,
         String mqttHost,
         int mqttPort,
+        String mqttTopicRegister,
+        String mqttTopicLogin,
+        String mqttTopicIssuePassword,
         String userRepositoryType,
         String sqliteDbPath
 ) {
@@ -31,6 +34,9 @@ public record PortalConfig(
         String openWrtUser = "root";
         String mqttHost = "127.0.0.1";
         int mqttPort = 1883;
+        String mqttTopicRegister = "portal/register/in";
+        String mqttTopicLogin = "portal/login/in";
+        String mqttTopicIssuePassword = "portal/password/issue/in";
         String userRepositoryType = "sqlite";
         String sqliteDbPath = "data/auth-service.db";
         String section = "";
@@ -67,6 +73,12 @@ public record PortalConfig(
                     mqttHost = parseString(l);
                 } else if ("mqtt".equals(section) && l.startsWith("port")) {
                     mqttPort = parseInt(l);
+                } else if ("mqtt".equals(section) && l.startsWith("topic_register")) {
+                    mqttTopicRegister = parseString(l);
+                } else if ("mqtt".equals(section) && l.startsWith("topic_login")) {
+                    mqttTopicLogin = parseString(l);
+                } else if ("mqtt".equals(section) && l.startsWith("topic_issue_password")) {
+                    mqttTopicIssuePassword = parseString(l);
                 } else if ("repository".equals(section) && l.startsWith("type")) {
                     userRepositoryType = parseString(l);
                 } else if ("repository".equals(section) && l.startsWith("sqlite_db_path")) {
@@ -78,7 +90,8 @@ public record PortalConfig(
 
         return new PortalConfig(
                 httpPort, sessionTtlSeconds, smtpHost, smtpPort, smtpFrom,
-                openWrtHost, openWrtPort, openWrtUser, mqttHost, mqttPort,
+                openWrtHost, openWrtPort, openWrtUser,
+                mqttHost, mqttPort, mqttTopicRegister, mqttTopicLogin, mqttTopicIssuePassword,
                 userRepositoryType, sqliteDbPath
         );
     }

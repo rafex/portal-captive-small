@@ -25,6 +25,7 @@ public final class AuthService implements RegisterUserUseCase, LoginUseCase, Iss
     private final EmailSender emailSender;
     private final OpenWrtAccessGateway openWrtAccessGateway;
     private final int sessionTtlSeconds;
+    private final RegistrationTemplatePolicy registrationTemplatePolicy = new RegistrationTemplatePolicy();
 
     public AuthService(UserRepository userRepository,
                        PasswordHasher passwordHasher,
@@ -42,6 +43,8 @@ public final class AuthService implements RegisterUserUseCase, LoginUseCase, Iss
 
     @Override
     public String register(RegisterUserCommand command) {
+        registrationTemplatePolicy.validate(command);
+
         String normalizedEmail = normalize(command.email());
         String normalizedPhone = normalize(command.phone());
 
@@ -70,7 +73,7 @@ public final class AuthService implements RegisterUserUseCase, LoginUseCase, Iss
                 salt
         );
         userRepository.save(user);
-        asyncEventPublisher.publish("portal/register", "{\"userId\":\"" + user.userId() + "\"}");
+        asyncEventPublisher.publish("portal/register", "{\"userId\":\"" + user.userId() + "\",\"template\":\"" + normalize(command.template()) + "\"}");
         return user.userId();
     }
 

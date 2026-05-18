@@ -15,6 +15,7 @@ public record PortalConfig(
         String openWrtHost,
         int openWrtPort,
         String openWrtUser,
+        boolean openWrtEnabled,
         String mqttHost,
         int mqttPort,
         String mqttTopicRegister,
@@ -24,7 +25,9 @@ public record PortalConfig(
         String mqttTopicLoginOut,
         String mqttTopicIssuePasswordOut,
         String userRepositoryType,
-        String sqliteDbPath
+        String sqliteDbPath,
+        String dbMqttUserRequestTopic,
+        int dbMqttResponseWaitSeconds
 ) {
     public static PortalConfig fromToml(Path path) {
         int httpPort = 8080;
@@ -35,6 +38,7 @@ public record PortalConfig(
         String openWrtHost = "192.168.1.1";
         int openWrtPort = 22;
         String openWrtUser = "root";
+        boolean openWrtEnabled = true;
         String mqttHost = "127.0.0.1";
         int mqttPort = 1883;
         String mqttTopicRegister = "portal/register/in";
@@ -45,6 +49,8 @@ public record PortalConfig(
         String mqttTopicIssuePasswordOut = "portal/password/issue/out";
         String userRepositoryType = "sqlite";
         String sqliteDbPath = "data/auth-service.db";
+        String dbMqttUserRequestTopic = "portal/db/user/request";
+        int dbMqttResponseWaitSeconds = 5;
         String section = "";
 
         try {
@@ -69,6 +75,8 @@ public record PortalConfig(
                     smtpPort = parseInt(l);
                 } else if ("smtp".equals(section) && l.startsWith("from")) {
                     smtpFrom = parseString(l);
+                } else if ("openwrt".equals(section) && l.startsWith("enabled")) {
+                    openWrtEnabled = parseBoolean(l);
                 } else if ("openwrt".equals(section) && l.startsWith("ssh_host")) {
                     openWrtHost = parseString(l);
                 } else if ("openwrt".equals(section) && l.startsWith("ssh_port")) {
@@ -95,6 +103,10 @@ public record PortalConfig(
                     userRepositoryType = parseString(l);
                 } else if ("repository".equals(section) && l.startsWith("sqlite_db_path")) {
                     sqliteDbPath = parseString(l);
+                } else if ("db_mqtt".equals(section) && l.startsWith("user_request_topic")) {
+                    dbMqttUserRequestTopic = parseString(l);
+                } else if ("db_mqtt".equals(section) && l.startsWith("response_wait_seconds")) {
+                    dbMqttResponseWaitSeconds = parseInt(l);
                 }
             }
         } catch (IOException ignored) {
@@ -102,16 +114,21 @@ public record PortalConfig(
 
         return new PortalConfig(
                 httpPort, sessionTtlSeconds, smtpHost, smtpPort, smtpFrom,
-                openWrtHost, openWrtPort, openWrtUser,
+                openWrtHost, openWrtPort, openWrtUser, openWrtEnabled,
                 mqttHost, mqttPort,
                 mqttTopicRegister, mqttTopicLogin, mqttTopicIssuePassword,
                 mqttTopicRegisterOut, mqttTopicLoginOut, mqttTopicIssuePasswordOut,
-                userRepositoryType, sqliteDbPath
+                userRepositoryType, sqliteDbPath,
+                dbMqttUserRequestTopic, dbMqttResponseWaitSeconds
         );
     }
 
     private static int parseInt(String line) {
         return Integer.parseInt(line.substring(line.indexOf('=') + 1).trim().replace("\"", ""));
+    }
+
+    private static boolean parseBoolean(String line) {
+        return Boolean.parseBoolean(line.substring(line.indexOf('=') + 1).trim());
     }
 
     private static String parseString(String line) {

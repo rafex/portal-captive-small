@@ -5,6 +5,9 @@ version := "0.1.0"
 validate:
     make validate
 
+test:
+    make test
+
 build:
     make build
 

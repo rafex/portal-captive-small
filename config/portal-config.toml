@@ -5,8 +5,12 @@ http_port = 8080
 internet_ttl_seconds = 3600
 
 [repository]
-type = "sqlite"
+type = "mqtt_rust"
 sqlite_db_path = "data/auth-service.db"
+
+[db_mqtt]
+user_request_topic = "portal/db/user/request"
+response_wait_seconds = 5
 
 [registration]
 templates_enabled = ["hotel", "restaurante", "escuela", "casa", "personalizado"]
@@ -49,6 +53,7 @@ from = "no-reply@example.com"
 use_starttls = true
 
 [openwrt]
+enabled = false
 ssh_host = "192.168.1.1"
 ssh_port = 22
 ssh_user = "root"

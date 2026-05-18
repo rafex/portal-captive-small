@@ -1,4 +1,4 @@
-.PHONY: validate build package clean release-local
+.PHONY: validate test build package clean release-local
 
 VERSION ?= 0.1.0
 DIST_DIR := dist
@@ -7,6 +7,9 @@ validate:
 	$(MAKE) -C scripts
 	$(MAKE) -C containers lint
 	$(MAKE) -C sql validate
+
+test:
+	$(MAKE) -C scripts/valid run
 
 build:
 	$(MAKE) -C frontend build

@@ -3,12 +3,14 @@ package com.portal.auth.bootstrap;
 import com.portal.auth.adapter.in.http.AuthHttpHandler;
 import com.portal.auth.adapter.in.http.MqttCommandConsumer;
 import com.portal.auth.adapter.out.memory.InMemoryUserRepository;
+import com.portal.auth.adapter.out.mqtt.MqttRustUserRepository;
 import com.portal.auth.adapter.out.network.SshOpenWrtAccessGateway;
 import com.portal.auth.adapter.out.notifications.MosquittoAsyncPublisher;
 import com.portal.auth.adapter.out.notifications.Sha256PasswordHasher;
 import com.portal.auth.adapter.out.notifications.SmtpSocketEmailSender;
 import com.portal.auth.adapter.out.sqlite.SqliteCliUserRepository;
 import com.portal.auth.application.port.out.AsyncEventPublisher;
+import com.portal.auth.application.port.out.OpenWrtAccessGateway;
 import com.portal.auth.application.port.out.UserRepository;
 import com.portal.auth.application.service.AuthService;
 import com.portal.auth.config.PortalConfig;
@@ -26,15 +28,21 @@ public final class AuthServer {
 
     public static void run(Path configPath) throws IOException {
         PortalConfig config = PortalConfig.fromToml(configPath);
-        UserRepository repository = buildRepository(config);
         AsyncEventPublisher publisher = new MosquittoAsyncPublisher(config.mqttHost(), config.mqttPort());
+        UserRepository repository = buildRepository(config);
+        OpenWrtAccessGateway openWrtGateway = new SshOpenWrtAccessGateway(
+                config.openWrtHost(),
+                config.openWrtPort(),
+                config.openWrtUser(),
+                config.openWrtEnabled()
+        );
 
         AuthService service = new AuthService(
                 repository,
                 new Sha256PasswordHasher(),
                 publisher,
                 new SmtpSocketEmailSender(config.smtpHost(), config.smtpPort(), config.smtpFrom()),
-                new SshOpenWrtAccessGateway(config.openWrtHost(), config.openWrtPort(), config.openWrtUser()),
+                openWrtGateway,
                 config.sessionTtlSeconds()
         );
 
@@ -66,6 +74,14 @@ public final class AuthServer {
     private static UserRepository buildRepository(PortalConfig config) throws IOException {
         if ("memory".equalsIgnoreCase(config.userRepositoryType())) {
             return new InMemoryUserRepository();
+        }
+        if ("mqtt_rust".equalsIgnoreCase(config.userRepositoryType())) {
+            return new MqttRustUserRepository(
+                    config.mqttHost(),
+                    config.mqttPort(),
+                    config.dbMqttUserRequestTopic(),
+                    config.dbMqttResponseWaitSeconds()
+            );
         }
         Path db = Path.of(config.sqliteDbPath());
         Path parent = db.getParent();

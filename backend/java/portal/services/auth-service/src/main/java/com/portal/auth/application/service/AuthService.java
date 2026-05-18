@@ -14,6 +14,7 @@ import com.portal.auth.application.port.out.UserRepository;
 import com.portal.auth.domain.User;
 
 import java.security.SecureRandom;
+import java.time.Instant;
 import java.util.Base64;
 import java.util.Locale;
 
@@ -93,9 +94,17 @@ public final class AuthService implements RegisterUserUseCase, LoginUseCase, Iss
             return new LoginResult(false, null, "invalid_password");
         }
 
-        openWrtAccessGateway.allowSession(user.userId(), sessionTtlSeconds);
+        String reason = "ok";
+        try {
+            openWrtAccessGateway.allowSession(user.userId(), sessionTtlSeconds);
+        } catch (RuntimeException e) {
+            reason = "ok_openwrt_degraded";
+            asyncEventPublisher.publish("portal/openwrt/error",
+                    "{\"userId\":\"" + user.userId() + "\",\"message\":\"" + sanitize(e.getMessage()) + "\"}");
+        }
+
         asyncEventPublisher.publish("portal/login", "{\"userId\":\"" + user.userId() + "\"}");
-        return new LoginResult(true, user.userId(), "ok");
+        return new LoginResult(true, user.userId(), reason);
     }
 
     @Override
@@ -113,7 +122,7 @@ public final class AuthService implements RegisterUserUseCase, LoginUseCase, Iss
         User updated = new User(
                 user.userId(), user.firstName(), user.lastName(), user.age(), user.email(), user.phone(),
                 user.mobile(), user.address(), user.socialFacebook(), user.socialInstagram(), user.socialTiktok(),
-                user.socialX(), hash, salt, user.createdAt(), java.time.Instant.now());
+                user.socialX(), hash, salt, user.createdAt(), Instant.now());
 
         userRepository.save(updated);
         emailSender.sendTemporaryPassword(normalizedEmail, temporaryPassword);
@@ -129,5 +138,12 @@ public final class AuthService implements RegisterUserUseCase, LoginUseCase, Iss
             return null;
         }
         return trimmed.toLowerCase(Locale.ROOT);
+    }
+
+    private static String sanitize(String value) {
+        if (value == null) {
+            return "unknown";
+        }
+        return value.replace("\"", "'");
     }
 }

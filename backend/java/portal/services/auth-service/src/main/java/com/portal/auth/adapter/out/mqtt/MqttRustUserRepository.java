@@ -18,12 +18,21 @@ public final class MqttRustUserRepository implements UserRepository {
     private final int port;
     private final String requestTopic;
     private final int responseWaitSeconds;
+    private final int maxRetries;
+    private final long retryBackoffMs;
 
-    public MqttRustUserRepository(String host, int port, String requestTopic, int responseWaitSeconds) {
+    public MqttRustUserRepository(String host,
+                                  int port,
+                                  String requestTopic,
+                                  int responseWaitSeconds,
+                                  int maxRetries,
+                                  long retryBackoffMs) {
         this.host = host;
         this.port = port;
         this.requestTopic = requestTopic;
         this.responseWaitSeconds = responseWaitSeconds;
+        this.maxRetries = Math.max(0, maxRetries);
+        this.retryBackoffMs = Math.max(10L, retryBackoffMs);
     }
 
     @Override
@@ -52,7 +61,7 @@ public final class MqttRustUserRepository implements UserRepository {
                 q("updatedAt") + ":" + qv(user.updatedAt().toString()) +
                 "}";
 
-        String response = call(payload, replyTopic);
+        String response = callWithRetry("user_save", payload, replyTopic, requestId);
         Map<String, String> json = SimpleJson.parseFlatObject(response);
         if (!"ok".equals(json.get("status"))) {
             throw new IllegalStateException("db_write_failed " + json.getOrDefault("error", "unknown"));
@@ -79,7 +88,7 @@ public final class MqttRustUserRepository implements UserRepository {
                 q(field) + ":" + qv(value) +
                 "}";
 
-        String response = call(payload, replyTopic);
+        String response = callWithRetry(op, payload, replyTopic, requestId);
         Map<String, String> json = SimpleJson.parseFlatObject(response);
         if (!"ok".equals(json.get("status"))) {
             throw new IllegalStateException("db_read_failed " + json.getOrDefault("error", "unknown"));
@@ -107,6 +116,37 @@ public final class MqttRustUserRepository implements UserRepository {
         ));
     }
 
+    private String callWithRetry(String op, String payload, String replyTopic, String requestId) {
+        long startNs = System.nanoTime();
+        RuntimeException last = null;
+
+        for (int attempt = 0; attempt <= maxRetries; attempt++) {
+            long attemptStartNs = System.nanoTime();
+            try {
+                String response = call(payload, replyTopic);
+                long attemptMs = (System.nanoTime() - attemptStartNs) / 1_000_000;
+                long totalMs = (System.nanoTime() - startNs) / 1_000_000;
+                System.out.println("db_mqtt_rpc op=" + op + " requestId=" + requestId +
+                        " status=ok attempt=" + (attempt + 1) + " attempt_ms=" + attemptMs +
+                        " total_ms=" + totalMs);
+                return response;
+            } catch (RuntimeException ex) {
+                last = ex;
+                long attemptMs = (System.nanoTime() - attemptStartNs) / 1_000_000;
+                System.err.println("db_mqtt_rpc op=" + op + " requestId=" + requestId +
+                        " status=error attempt=" + (attempt + 1) + " attempt_ms=" + attemptMs +
+                        " error=" + sanitize(ex.getMessage()));
+
+                if (attempt >= maxRetries) {
+                    break;
+                }
+                sleepBackoff(attempt);
+            }
+        }
+
+        throw new IllegalStateException("db_mqtt_rpc_exhausted op=" + op + " requestId=" + requestId, last);
+    }
+
     private String call(String payload, String replyTopic) {
         Process sub = null;
         try {
@@ -130,13 +170,26 @@ public final class MqttRustUserRepository implements UserRepository {
                 throw new IllegalStateException("mqtt_sub_timeout_or_error code=" + subCode);
             }
             return response;
-        } catch (IOException | InterruptedException e) {
+        } catch (IOException e) {
+            throw new IllegalStateException("mqtt_rpc_io_failed", e);
+        } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new IllegalStateException("mqtt_rpc_failed", e);
+            throw new IllegalStateException("mqtt_rpc_interrupted", e);
         } finally {
             if (sub != null) {
                 sub.destroy();
             }
+        }
+    }
+
+    private void sleepBackoff(int attempt) {
+        long factor = 1L << Math.min(attempt, 10);
+        long sleepMs = Math.min(retryBackoffMs * factor, 5_000L);
+        try {
+            Thread.sleep(sleepMs);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("mqtt_retry_interrupted", e);
         }
     }
 
@@ -149,6 +202,13 @@ public final class MqttRustUserRepository implements UserRepository {
             return null;
         }
         return Integer.parseInt(raw);
+    }
+
+    private static String sanitize(String raw) {
+        if (raw == null) {
+            return "unknown";
+        }
+        return raw.replace("\"", "'");
     }
 
     private static String q(String value) {

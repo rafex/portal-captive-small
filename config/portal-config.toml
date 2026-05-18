@@ -11,6 +11,8 @@ sqlite_db_path = "data/auth-service.db"
 [db_mqtt]
 user_request_topic = "portal/db/user/request"
 response_wait_seconds = 5
+max_retries = 2
+retry_backoff_ms = 100
 
 [registration]
 templates_enabled = ["hotel", "restaurante", "escuela", "casa", "personalizado"]

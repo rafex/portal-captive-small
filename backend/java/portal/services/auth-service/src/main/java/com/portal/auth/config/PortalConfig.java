@@ -27,7 +27,9 @@ public record PortalConfig(
         String userRepositoryType,
         String sqliteDbPath,
         String dbMqttUserRequestTopic,
-        int dbMqttResponseWaitSeconds
+        int dbMqttResponseWaitSeconds,
+        int dbMqttMaxRetries,
+        int dbMqttRetryBackoffMs
 ) {
     public static PortalConfig fromToml(Path path) {
         int httpPort = 8080;
@@ -51,6 +53,8 @@ public record PortalConfig(
         String sqliteDbPath = "data/auth-service.db";
         String dbMqttUserRequestTopic = "portal/db/user/request";
         int dbMqttResponseWaitSeconds = 5;
+        int dbMqttMaxRetries = 2;
+        int dbMqttRetryBackoffMs = 100;
         String section = "";
 
         try {
@@ -107,6 +111,10 @@ public record PortalConfig(
                     dbMqttUserRequestTopic = parseString(l);
                 } else if ("db_mqtt".equals(section) && l.startsWith("response_wait_seconds")) {
                     dbMqttResponseWaitSeconds = parseInt(l);
+                } else if ("db_mqtt".equals(section) && l.startsWith("max_retries")) {
+                    dbMqttMaxRetries = parseInt(l);
+                } else if ("db_mqtt".equals(section) && l.startsWith("retry_backoff_ms")) {
+                    dbMqttRetryBackoffMs = parseInt(l);
                 }
             }
         } catch (IOException ignored) {
@@ -119,7 +127,8 @@ public record PortalConfig(
                 mqttTopicRegister, mqttTopicLogin, mqttTopicIssuePassword,
                 mqttTopicRegisterOut, mqttTopicLoginOut, mqttTopicIssuePasswordOut,
                 userRepositoryType, sqliteDbPath,
-                dbMqttUserRequestTopic, dbMqttResponseWaitSeconds
+                dbMqttUserRequestTopic, dbMqttResponseWaitSeconds,
+                dbMqttMaxRetries, dbMqttRetryBackoffMs
         );
     }
 

@@ -80,7 +80,9 @@ public final class AuthServer {
                     config.mqttHost(),
                     config.mqttPort(),
                     config.dbMqttUserRequestTopic(),
-                    config.dbMqttResponseWaitSeconds()
+                    config.dbMqttResponseWaitSeconds(),
+                    config.dbMqttMaxRetries(),
+                    config.dbMqttRetryBackoffMs()
             );
         }
         Path db = Path.of(config.sqliteDbPath());

@@ -1,4 +1,4 @@
-.PHONY: run mqtt-e2e backend-http-smoke backend-selftest db-mqtt-e2e
+.PHONY: run mqtt-e2e backend-http-smoke backend-selftest db-mqtt-e2e auth-mqtt-rust-e2e
 
 run: backend-selftest backend-http-smoke
 	@echo "scripts/valid checks"
@@ -11,8 +11,10 @@ run: backend-selftest backend-http-smoke
 	@if command -v mosquitto >/dev/null 2>&1 && command -v mosquitto_pub >/dev/null 2>&1 && command -v mosquitto_sub >/dev/null 2>&1; then \
 		echo "Running DB MQTT E2E"; \
 		bash db-mqtt-local-stack.sh; \
+		echo "Running FULL auth-mqtt-rust E2E"; \
+		bash auth-mqtt-rust-e2e.sh; \
 	else \
-		echo "Skipping db-mqtt-local-stack.sh (mosquitto + clients not installed)"; \
+		echo "Skipping db/auth-mqtt-rust e2e (mosquitto + clients not installed)"; \
 	fi
 
 backend-selftest:
@@ -27,3 +29,6 @@ mqtt-e2e:
 
 db-mqtt-e2e:
 	bash db-mqtt-local-stack.sh
+
+auth-mqtt-rust-e2e:
+	bash auth-mqtt-rust-e2e.sh

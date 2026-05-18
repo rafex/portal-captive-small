@@ -27,8 +27,8 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Install SQLite + Mosquitto clients
-        run: sudo apt-get update && sudo apt-get install -y sqlite3 mosquitto-clients
+      - name: Install SQLite + Mosquitto
+        run: sudo apt-get update && sudo apt-get install -y sqlite3 mosquitto mosquitto-clients
 
       - name: Validate
         run: make validate

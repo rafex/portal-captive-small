@@ -3,7 +3,7 @@
 ## SpecNative
 ### Meta
 - `spec_id`: `portal-captive-small-mqtt-rust-sqlite-wal`
-- `version`: `1.0.0`
+- `version`: `1.1.0`
 - `status`: `in_progress`
 - `date`: `2026-05-18`
 
@@ -73,7 +73,11 @@ Implementar y estabilizar el flujo:
 - Añadir métricas de latencia y reintentos con backoff.
 
 ### Current Progress
-- `M1` implementado (base).
-- `M2` implementado (base).
-- `M3` parcial (script listo, requiere mosquitto en entorno).
+- `M1` implementado.
+- `M2` implementado.
+- `M3` implementado a nivel scripts/CI (`db-mqtt-e2e`, `auth-mqtt-rust-e2e`) y pendiente de ejecución en entorno con mosquitto activo.
 - `M4` pendiente.
+
+### Execution Notes
+- En CI se instala `mosquitto` + `mosquitto-clients` para habilitar E2E MQTT.
+- En local sin mosquitto, los tests E2E MQTT se saltan de forma explícita para no bloquear desarrollo.

@@ -126,6 +126,7 @@ public final class MqttRustUserRepository implements UserRepository {
                 String response = call(payload, replyTopic);
                 long attemptMs = (System.nanoTime() - attemptStartNs) / 1_000_000;
                 long totalMs = (System.nanoTime() - startNs) / 1_000_000;
+                DbMqttMetrics.recordSuccess(totalMs, attempt);
                 System.out.println("db_mqtt_rpc op=" + op + " requestId=" + requestId +
                         " status=ok attempt=" + (attempt + 1) + " attempt_ms=" + attemptMs +
                         " total_ms=" + totalMs);
@@ -144,6 +145,8 @@ public final class MqttRustUserRepository implements UserRepository {
             }
         }
 
+        long totalMs = (System.nanoTime() - startNs) / 1_000_000;
+        DbMqttMetrics.recordError(totalMs, maxRetries);
         throw new IllegalStateException("db_mqtt_rpc_exhausted op=" + op + " requestId=" + requestId, last);
     }
 

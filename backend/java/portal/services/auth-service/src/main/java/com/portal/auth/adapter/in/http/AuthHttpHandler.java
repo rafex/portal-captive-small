@@ -1,5 +1,6 @@
 package com.portal.auth.adapter.in.http;
 
+import com.portal.auth.adapter.out.mqtt.DbMqttMetrics;
 import com.portal.auth.application.port.in.IssuePasswordUseCase;
 import com.portal.auth.application.port.in.LoginCommand;
 import com.portal.auth.application.port.in.LoginResult;
@@ -42,6 +43,10 @@ public final class AuthHttpHandler implements HttpHandler {
         try {
             if ("/health".equals(path) && "GET".equals(method)) {
                 writeJson(exchange, 200, "{\"status\":\"ok\"}");
+                return;
+            }
+            if ("/metrics/db-mqtt".equals(path) && "GET".equals(method)) {
+                writeJson(exchange, 200, DbMqttMetrics.asJson());
                 return;
             }
             if ("/auth/register".equals(path) && "POST".equals(method)) {

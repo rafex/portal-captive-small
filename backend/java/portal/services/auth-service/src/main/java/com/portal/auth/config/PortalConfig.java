@@ -1,10 +1,9 @@
 package com.portal.auth.config;
 
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
+import com.portal.auth.shared.SimpleToml;
+
 import java.nio.file.Path;
-import java.util.List;
+import java.util.Map;
 
 public record PortalConfig(
         int httpPort,
@@ -32,119 +31,60 @@ public record PortalConfig(
         int dbMqttRetryBackoffMs
 ) {
     public static PortalConfig fromToml(Path path) {
-        int httpPort = 8080;
-        int sessionTtlSeconds = 3600;
-        String smtpHost = "127.0.0.1";
-        int smtpPort = 25;
-        String smtpFrom = "no-reply@example.com";
-        String openWrtHost = "192.168.1.1";
-        int openWrtPort = 22;
-        String openWrtUser = "root";
-        boolean openWrtEnabled = true;
-        String mqttHost = "127.0.0.1";
-        int mqttPort = 1883;
-        String mqttTopicRegister = "portal/register/in";
-        String mqttTopicLogin = "portal/login/in";
-        String mqttTopicIssuePassword = "portal/password/issue/in";
-        String mqttTopicRegisterOut = "portal/register/out";
-        String mqttTopicLoginOut = "portal/login/out";
-        String mqttTopicIssuePasswordOut = "portal/password/issue/out";
-        String userRepositoryType = "sqlite";
-        String sqliteDbPath = "data/auth-service.db";
-        String dbMqttUserRequestTopic = "portal/db/user/request";
-        int dbMqttResponseWaitSeconds = 5;
-        int dbMqttMaxRetries = 2;
-        int dbMqttRetryBackoffMs = 100;
-        String section = "";
-
-        try {
-            List<String> lines = Files.readAllLines(path, StandardCharsets.UTF_8);
-            for (String line : lines) {
-                String l = line.trim();
-                if (l.isEmpty() || l.startsWith("#")) {
-                    continue;
-                }
-                if (l.startsWith("[") && l.endsWith("]")) {
-                    section = l.substring(1, l.length() - 1).trim();
-                    continue;
-                }
-
-                if ("server".equals(section) && l.startsWith("http_port")) {
-                    httpPort = parseInt(l);
-                } else if ("session".equals(section) && l.startsWith("internet_ttl_seconds")) {
-                    sessionTtlSeconds = parseInt(l);
-                } else if ("smtp".equals(section) && l.startsWith("host")) {
-                    smtpHost = parseString(l);
-                } else if ("smtp".equals(section) && l.startsWith("port")) {
-                    smtpPort = parseInt(l);
-                } else if ("smtp".equals(section) && l.startsWith("from")) {
-                    smtpFrom = parseString(l);
-                } else if ("openwrt".equals(section) && l.startsWith("enabled")) {
-                    openWrtEnabled = parseBoolean(l);
-                } else if ("openwrt".equals(section) && l.startsWith("ssh_host")) {
-                    openWrtHost = parseString(l);
-                } else if ("openwrt".equals(section) && l.startsWith("ssh_port")) {
-                    openWrtPort = parseInt(l);
-                } else if ("openwrt".equals(section) && l.startsWith("ssh_user")) {
-                    openWrtUser = parseString(l);
-                } else if ("mqtt".equals(section) && l.startsWith("host")) {
-                    mqttHost = parseString(l);
-                } else if ("mqtt".equals(section) && l.startsWith("port")) {
-                    mqttPort = parseInt(l);
-                } else if ("mqtt".equals(section) && l.startsWith("topic_register =")) {
-                    mqttTopicRegister = parseString(l);
-                } else if ("mqtt".equals(section) && l.startsWith("topic_login =")) {
-                    mqttTopicLogin = parseString(l);
-                } else if ("mqtt".equals(section) && l.startsWith("topic_issue_password =")) {
-                    mqttTopicIssuePassword = parseString(l);
-                } else if ("mqtt".equals(section) && l.startsWith("topic_register_out =")) {
-                    mqttTopicRegisterOut = parseString(l);
-                } else if ("mqtt".equals(section) && l.startsWith("topic_login_out =")) {
-                    mqttTopicLoginOut = parseString(l);
-                } else if ("mqtt".equals(section) && l.startsWith("topic_issue_password_out =")) {
-                    mqttTopicIssuePasswordOut = parseString(l);
-                } else if ("repository".equals(section) && l.startsWith("type")) {
-                    userRepositoryType = parseString(l);
-                } else if ("repository".equals(section) && l.startsWith("sqlite_db_path")) {
-                    sqliteDbPath = parseString(l);
-                } else if ("db_mqtt".equals(section) && l.startsWith("user_request_topic")) {
-                    dbMqttUserRequestTopic = parseString(l);
-                } else if ("db_mqtt".equals(section) && l.startsWith("response_wait_seconds")) {
-                    dbMqttResponseWaitSeconds = parseInt(l);
-                } else if ("db_mqtt".equals(section) && l.startsWith("max_retries")) {
-                    dbMqttMaxRetries = parseInt(l);
-                } else if ("db_mqtt".equals(section) && l.startsWith("retry_backoff_ms")) {
-                    dbMqttRetryBackoffMs = parseInt(l);
-                }
-            }
-        } catch (IOException ignored) {
-        }
+        Map<String, String> kv = SimpleToml.parseFlat(path);
 
         return new PortalConfig(
-                httpPort, sessionTtlSeconds, smtpHost, smtpPort, smtpFrom,
-                openWrtHost, openWrtPort, openWrtUser, openWrtEnabled,
-                mqttHost, mqttPort,
-                mqttTopicRegister, mqttTopicLogin, mqttTopicIssuePassword,
-                mqttTopicRegisterOut, mqttTopicLoginOut, mqttTopicIssuePasswordOut,
-                userRepositoryType, sqliteDbPath,
-                dbMqttUserRequestTopic, dbMqttResponseWaitSeconds,
-                dbMqttMaxRetries, dbMqttRetryBackoffMs
+                intOrDefault(kv, "server.http_port", 8080),
+                intOrDefault(kv, "session.internet_ttl_seconds", 3600),
+                strOrDefault(kv, "smtp.host", "127.0.0.1"),
+                intOrDefault(kv, "smtp.port", 25),
+                strOrDefault(kv, "smtp.from", "no-reply@example.com"),
+                strOrDefault(kv, "openwrt.ssh_host", "192.168.1.1"),
+                intOrDefault(kv, "openwrt.ssh_port", 22),
+                strOrDefault(kv, "openwrt.ssh_user", "root"),
+                boolOrDefault(kv, "openwrt.enabled", true),
+                strOrDefault(kv, "mqtt.host", "127.0.0.1"),
+                intOrDefault(kv, "mqtt.port", 1883),
+                strOrDefault(kv, "mqtt.topic_register", "portal/register/in"),
+                strOrDefault(kv, "mqtt.topic_login", "portal/login/in"),
+                strOrDefault(kv, "mqtt.topic_issue_password", "portal/password/issue/in"),
+                strOrDefault(kv, "mqtt.topic_register_out", "portal/register/out"),
+                strOrDefault(kv, "mqtt.topic_login_out", "portal/login/out"),
+                strOrDefault(kv, "mqtt.topic_issue_password_out", "portal/password/issue/out"),
+                strOrDefault(kv, "repository.type", "sqlite"),
+                strOrDefault(kv, "repository.sqlite_db_path", "data/auth-service.db"),
+                strOrDefault(kv, "db_mqtt.user_request_topic", "portal/db/user/request"),
+                intOrDefault(kv, "db_mqtt.response_wait_seconds", 5),
+                intOrDefault(kv, "db_mqtt.max_retries", 2),
+                intOrDefault(kv, "db_mqtt.retry_backoff_ms", 100)
         );
     }
 
-    private static int parseInt(String line) {
-        return Integer.parseInt(line.substring(line.indexOf('=') + 1).trim().replace("\"", ""));
-    }
-
-    private static boolean parseBoolean(String line) {
-        return Boolean.parseBoolean(line.substring(line.indexOf('=') + 1).trim());
-    }
-
-    private static String parseString(String line) {
-        String raw = line.substring(line.indexOf('=') + 1).trim();
-        if (raw.startsWith("\"") && raw.endsWith("\"")) {
-            return raw.substring(1, raw.length() - 1);
+    private static String strOrDefault(Map<String, String> kv, String key, String def) {
+        String v = kv.get(key);
+        if (v == null || v.isBlank()) {
+            return def;
         }
-        return raw;
+        return v;
+    }
+
+    private static int intOrDefault(Map<String, String> kv, String key, int def) {
+        String v = kv.get(key);
+        if (v == null || v.isBlank()) {
+            return def;
+        }
+        try {
+            return Integer.parseInt(v);
+        } catch (NumberFormatException e) {
+            return def;
+        }
+    }
+
+    private static boolean boolOrDefault(Map<String, String> kv, String key, boolean def) {
+        String v = kv.get(key);
+        if (v == null || v.isBlank()) {
+            return def;
+        }
+        return Boolean.parseBoolean(v);
     }
 }

@@ -19,6 +19,11 @@ El worker configura al iniciar:
 - `PRAGMA busy_timeout=5000;`
 - `PRAGMA foreign_keys=ON;`
 
+## Endpoints operativos
+- `GET /health/db-mqtt`
+- `GET /metrics/db-mqtt`
+- `GET /metrics/db-mqtt/prometheus`
+
 ## Ejecución local
 ```bash
 bash scripts/valid/db-mqtt-local-stack.sh

@@ -9,7 +9,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
-public final class MqttRustUserRepository implements UserRepository {
+public final class MqttRustUserRepository implements UserRepository, AutoCloseable {
     private final int responseWaitSeconds;
     private final int maxRetries;
     private final long retryBackoffMs;
@@ -25,6 +25,10 @@ public final class MqttRustUserRepository implements UserRepository {
         this.maxRetries = Math.max(0, maxRetries);
         this.retryBackoffMs = Math.max(10L, retryBackoffMs);
         this.rpcClient = new MqttCliRpcClient(host, port, requestTopic, "portal/db/user/response/#");
+    }
+
+    public boolean isHealthy() {
+        return rpcClient.isHealthy();
     }
 
     @Override
@@ -182,5 +186,10 @@ public final class MqttRustUserRepository implements UserRepository {
 
     private static String qn(Integer value) {
         return value == null ? "null" : String.valueOf(value);
+    }
+
+    @Override
+    public void close() {
+        rpcClient.close();
     }
 }

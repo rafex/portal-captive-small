@@ -13,8 +13,9 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
-public final class MqttCliRpcClient {
+public final class MqttCliRpcClient implements AutoCloseable {
     private final String host;
     private final int port;
     private final String requestTopic;
@@ -22,6 +23,7 @@ public final class MqttCliRpcClient {
 
     private final Map<String, LinkedBlockingQueue<String>> inflight = new ConcurrentHashMap<>();
     private final Object writeLock = new Object();
+    private final AtomicBoolean running = new AtomicBoolean(false);
 
     private Process subProcess;
     private Process pubProcess;
@@ -54,7 +56,11 @@ public final class MqttCliRpcClient {
         }
     }
 
-    private void startProcesses() {
+    public boolean isHealthy() {
+        return running.get() && subProcess != null && subProcess.isAlive() && pubProcess != null && pubProcess.isAlive();
+    }
+
+    private synchronized void startProcesses() {
         try {
             subProcess = new ProcessBuilder(
                     "mosquitto_sub", "-h", host, "-p", String.valueOf(port), "-t", responseTopicWildcard
@@ -64,24 +70,27 @@ public final class MqttCliRpcClient {
                     "mosquitto_pub", "-h", host, "-p", String.valueOf(port), "-t", requestTopic, "-l"
             ).start();
             pubWriter = new BufferedWriter(new OutputStreamWriter(pubProcess.getOutputStream(), StandardCharsets.UTF_8));
+            running.set(true);
 
             Thread subThread = new Thread(this::readLoop, "mqtt-rpc-sub-loop");
             subThread.setDaemon(true);
             subThread.start();
         } catch (IOException e) {
+            running.set(false);
             throw new IllegalStateException("mqtt_cli_start_failed", e);
         }
     }
 
     private void ensureRunning() {
-        if (subProcess == null || !subProcess.isAlive() || pubProcess == null || !pubProcess.isAlive()) {
+        if (!isHealthy()) {
             restartProcesses();
         }
     }
 
-    private void restartProcesses() {
+    private synchronized void restartProcesses() {
         destroyProcess(subProcess);
         destroyProcess(pubProcess);
+        running.set(false);
         startProcesses();
     }
 
@@ -101,11 +110,13 @@ public final class MqttCliRpcClient {
     private void readLoop() {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(subProcess.getInputStream(), StandardCharsets.UTF_8))) {
             String line;
-            while ((line = reader.readLine()) != null) {
+            while ((line = reader.readLine()) != null && running.get()) {
                 dispatch(line);
             }
         } catch (IOException e) {
-            System.err.println("[" + Instant.now() + "] mqtt_rpc_sub_read_error " + e.getMessage());
+            if (running.get()) {
+                System.err.println("[" + Instant.now() + "] mqtt_rpc_sub_read_error " + e.getMessage());
+            }
         }
     }
 
@@ -122,6 +133,17 @@ public final class MqttCliRpcClient {
             }
         } catch (Exception ignored) {
         }
+    }
+
+    @Override
+    public synchronized void close() {
+        running.set(false);
+        destroyProcess(subProcess);
+        destroyProcess(pubProcess);
+        subProcess = null;
+        pubProcess = null;
+        pubWriter = null;
+        inflight.clear();
     }
 
     private static void destroyProcess(Process process) {

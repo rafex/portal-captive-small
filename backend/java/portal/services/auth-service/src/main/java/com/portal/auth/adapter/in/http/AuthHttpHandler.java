@@ -14,18 +14,22 @@ import com.sun.net.httpserver.HttpHandler;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import java.util.function.Supplier;
 
 public final class AuthHttpHandler implements HttpHandler {
     private final RegisterUserUseCase registerUserUseCase;
     private final LoginUseCase loginUseCase;
     private final IssuePasswordUseCase issuePasswordUseCase;
+    private final Supplier<Boolean> dbMqttHealthSupplier;
 
     public AuthHttpHandler(RegisterUserUseCase registerUserUseCase,
                            LoginUseCase loginUseCase,
-                           IssuePasswordUseCase issuePasswordUseCase) {
+                           IssuePasswordUseCase issuePasswordUseCase,
+                           Supplier<Boolean> dbMqttHealthSupplier) {
         this.registerUserUseCase = registerUserUseCase;
         this.loginUseCase = loginUseCase;
         this.issuePasswordUseCase = issuePasswordUseCase;
+        this.dbMqttHealthSupplier = dbMqttHealthSupplier;
     }
 
     @Override
@@ -45,8 +49,18 @@ public final class AuthHttpHandler implements HttpHandler {
                 writeJson(exchange, 200, "{\"status\":\"ok\"}");
                 return;
             }
+            if ("/health/db-mqtt".equals(path) && "GET".equals(method)) {
+                boolean healthy = dbMqttHealthSupplier.get();
+                writeJson(exchange, healthy ? 200 : 503,
+                        "{\"component\":\"db_mqtt\",\"healthy\":" + healthy + "}");
+                return;
+            }
             if ("/metrics/db-mqtt".equals(path) && "GET".equals(method)) {
                 writeJson(exchange, 200, DbMqttMetrics.asJson());
+                return;
+            }
+            if ("/metrics/db-mqtt/prometheus".equals(path) && "GET".equals(method)) {
+                writeText(exchange, 200, "text/plain; version=0.0.4", DbMqttMetrics.asPrometheus());
                 return;
             }
             if ("/auth/register".equals(path) && "POST".equals(method)) {
@@ -127,8 +141,12 @@ public final class AuthHttpHandler implements HttpHandler {
     }
 
     private static void writeJson(HttpExchange exchange, int status, String body) throws IOException {
+        writeText(exchange, status, "application/json; charset=utf-8", body);
+    }
+
+    private static void writeText(HttpExchange exchange, int status, String contentType, String body) throws IOException {
         byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
-        exchange.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
+        exchange.getResponseHeaders().set("Content-Type", contentType);
         exchange.sendResponseHeaders(status, bytes.length);
         exchange.getResponseBody().write(bytes);
         exchange.close();

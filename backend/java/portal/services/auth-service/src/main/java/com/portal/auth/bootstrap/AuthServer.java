@@ -21,6 +21,7 @@ import java.net.InetSocketAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.Executors;
+import java.util.function.Supplier;
 
 public final class AuthServer {
     private AuthServer() {
@@ -62,10 +63,18 @@ public final class AuthServer {
         );
         commandConsumer.start();
 
+        Supplier<Boolean> dbMqttHealth = () -> !(repository instanceof MqttRustUserRepository r) || r.isHealthy();
+
         HttpServer httpServer = HttpServer.create(new InetSocketAddress(config.httpPort()), 0);
-        httpServer.createContext("/", new AuthHttpHandler(service, service, service));
+        httpServer.createContext("/", new AuthHttpHandler(service, service, service, dbMqttHealth));
         httpServer.setExecutor(Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors()));
         httpServer.start();
+
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            if (repository instanceof MqttRustUserRepository r) {
+                r.close();
+            }
+        }, "auth-shutdown-hook"));
 
         System.out.println("auth-service listening on :" + config.httpPort());
         System.out.println("auth-service repository=" + config.userRepositoryType());

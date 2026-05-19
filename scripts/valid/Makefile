@@ -1,4 +1,4 @@
-.PHONY: run mqtt-e2e backend-http-smoke backend-selftest db-mqtt-e2e auth-mqtt-rust-e2e auth-mqtt-rust-concurrency
+.PHONY: run mqtt-e2e backend-http-smoke backend-selftest db-mqtt-e2e auth-mqtt-rust-e2e auth-mqtt-rust-concurrency rpi3b-lxc-smoke
 
 run: backend-selftest backend-http-smoke
 	@echo "scripts/valid checks"
@@ -37,3 +37,6 @@ auth-mqtt-rust-e2e:
 
 auth-mqtt-rust-concurrency:
 	bash auth-mqtt-rust-concurrency.sh
+
+rpi3b-lxc-smoke:
+	bash rpi3b-lxc-smoke.sh

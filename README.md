@@ -6,7 +6,7 @@ Portal cautivo ultraligero para Raspberry Pi 3B, orientado a despliegue reproduc
 - Frontend: Vite + HTML + CSS + JavaScript puro
 - Backend: Java 21 (solo bibliotecas estándar JDK, sin frameworks), Maven, arquitectura hexagonal
 - Persistencia: SQLite por microservicio
-- Módulo nativo: Rust `.so` para acceso SQLite
+- Módulo nativo: Rust `.so` + worker MQTT para acceso SQLite WAL
 - Mensajería asíncrona: MQTT (Mosquitto)
 - Integración de red: OpenWrt vía SSH + UCI
 
@@ -22,8 +22,20 @@ Portal cautivo ultraligero para Raspberry Pi 3B, orientado a despliegue reproduc
 ## Inicio rápido
 ```bash
 just validate
+just test
 just build
 just package
+```
+
+## Raspberry Pi 3B (directo)
+1. Preparar host para LXC (borra Docker/Podman):
+```bash
+sudo bash scripts/install/rpi3b-prepare-lxc.sh
+```
+
+2. Instalar y arrancar stack en LXC:
+```bash
+sudo bash scripts/install/rpi3b-direct-install.sh v0.1.0
 ```
 
 ## Build y orquestación

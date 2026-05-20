@@ -29,11 +29,11 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           mkdir -p dist
           tar -czf "dist/frontend-${VERSION}.tar.gz" -C frontend/javascripts/portal dist
-          sha256sum "dist/frontend-${VERSION}.tar.gz" > "dist/frontend-${VERSION}.tar.gz.sha256"
+          (cd dist && sha256sum "frontend-${VERSION}.tar.gz" > "frontend-${VERSION}.tar.gz.sha256")
           tar -czf "dist/frontend-id-build-${VERSION}.tar.gz" -C frontend/javascripts/portal dist
-          sha256sum "dist/frontend-id-build-${VERSION}.tar.gz" > "dist/frontend-id-build-${VERSION}.tar.gz.sha256"
+          (cd dist && sha256sum "frontend-id-build-${VERSION}.tar.gz" > "frontend-id-build-${VERSION}.tar.gz.sha256")
           (cd frontend/javascripts/portal && zip -rq "../../../dist/frontend-id-build-${VERSION}.zip" dist)
-          sha256sum "dist/frontend-id-build-${VERSION}.zip" > "dist/frontend-id-build-${VERSION}.zip.sha256"
+          (cd dist && sha256sum "frontend-id-build-${VERSION}.zip" > "frontend-id-build-${VERSION}.zip.sha256")
 
       - name: Upload frontend artifacts
         uses: actions/upload-artifact@v4
@@ -106,9 +106,9 @@ jobs:
           cp scripts/install/rpi3b-lxc-install.sh dist/
           cp scripts/install/rpi3b-prepare-lxc.sh dist/
           tar -czf "dist/backend-${VERSION}-${{ matrix.arch }}.tar.gz" -C dist/package backend
-          sha256sum "dist/auth-service-fat-${VERSION}-${{ matrix.arch }}.jar" > "dist/auth-service-fat-${VERSION}-${{ matrix.arch }}.jar.sha256"
-          sha256sum "dist/db-mqtt-worker-${VERSION}-${{ matrix.arch }}" > "dist/db-mqtt-worker-${VERSION}-${{ matrix.arch }}.sha256"
-          sha256sum "dist/backend-${VERSION}-${{ matrix.arch }}.tar.gz" > "dist/backend-${VERSION}-${{ matrix.arch }}.tar.gz.sha256"
+          (cd dist && sha256sum "auth-service-fat-${VERSION}-${{ matrix.arch }}.jar" > "auth-service-fat-${VERSION}-${{ matrix.arch }}.jar.sha256")
+          (cd dist && sha256sum "db-mqtt-worker-${VERSION}-${{ matrix.arch }}" > "db-mqtt-worker-${VERSION}-${{ matrix.arch }}.sha256")
+          (cd dist && sha256sum "backend-${VERSION}-${{ matrix.arch }}.tar.gz" > "backend-${VERSION}-${{ matrix.arch }}.tar.gz.sha256")
 
       - name: Upload backend artifacts (${{ matrix.arch }})
         uses: actions/upload-artifact@v4

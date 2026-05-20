@@ -13,6 +13,20 @@ INSTALL_ROOT="${INSTALL_ROOT:-/opt/portal-captive-small}"
 DIST_DIR="${DIST_DIR:-/tmp/portal-captive-small-dist}"
 ARCH="${ARCH:-arm64}"
 
+verify_checksum() {
+  local file="$1"
+  local checksum_file="$2"
+  local expected actual
+  expected="$(awk '{print $1}' "$checksum_file" | head -n1)"
+  actual="$(sha256sum "$file" | awk '{print $1}')"
+  if [[ -z "$expected" || "$expected" != "$actual" ]]; then
+    echo "Checksum inválido para $file"
+    echo "Esperado: $expected"
+    echo "Actual:   $actual"
+    exit 1
+  fi
+}
+
 mkdir -p "$DIST_DIR" "$INSTALL_ROOT"
 cd "$DIST_DIR"
 
@@ -22,8 +36,8 @@ curl -fsSLO "${BASE_URL}/backend-${VERSION#v}-${ARCH}.tar.gz"
 curl -fsSLO "${BASE_URL}/backend-${VERSION#v}-${ARCH}.tar.gz.sha256"
 curl -fsSLO "${BASE_URL}/script-install.sh"
 
-sha256sum -c "frontend-${VERSION#v}.tar.gz.sha256"
-sha256sum -c "backend-${VERSION#v}-${ARCH}.tar.gz.sha256"
+verify_checksum "frontend-${VERSION#v}.tar.gz" "frontend-${VERSION#v}.tar.gz.sha256"
+verify_checksum "backend-${VERSION#v}-${ARCH}.tar.gz" "backend-${VERSION#v}-${ARCH}.tar.gz.sha256"
 
 tar -xzf "frontend-${VERSION#v}.tar.gz" -C "$INSTALL_ROOT"
 tar -xzf "backend-${VERSION#v}-${ARCH}.tar.gz" -C "$INSTALL_ROOT"

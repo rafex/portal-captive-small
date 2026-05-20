@@ -11,13 +11,27 @@ BASE_URL="https://github.com/rafex/portal-captive-small/releases/download/${VERS
 ARCH="${ARCH:-arm64}"
 VER_NO_V="${VERSION#v}"
 
+verify_checksum() {
+  local file="$1"
+  local checksum_file="$2"
+  local expected actual
+  expected="$(awk '{print $1}' "$checksum_file" | head -n1)"
+  actual="$(sha256sum "$file" | awk '{print $1}')"
+  if [[ -z "$expected" || "$expected" != "$actual" ]]; then
+    echo "Checksum inválido para $file"
+    echo "Esperado: $expected"
+    echo "Actual:   $actual"
+    exit 1
+  fi
+}
+
 curl -fsSLO "${BASE_URL}/frontend-${VER_NO_V}.tar.gz"
 curl -fsSLO "${BASE_URL}/frontend-${VER_NO_V}.tar.gz.sha256"
 curl -fsSLO "${BASE_URL}/backend-${VER_NO_V}-${ARCH}.tar.gz"
 curl -fsSLO "${BASE_URL}/backend-${VER_NO_V}-${ARCH}.tar.gz.sha256"
 
-sha256sum -c "frontend-${VER_NO_V}.tar.gz.sha256"
-sha256sum -c "backend-${VER_NO_V}-${ARCH}.tar.gz.sha256"
+verify_checksum "frontend-${VER_NO_V}.tar.gz" "frontend-${VER_NO_V}.tar.gz.sha256"
+verify_checksum "backend-${VER_NO_V}-${ARCH}.tar.gz" "backend-${VER_NO_V}-${ARCH}.tar.gz.sha256"
 
 tar -xzf "frontend-${VER_NO_V}.tar.gz"
 tar -xzf "backend-${VER_NO_V}-${ARCH}.tar.gz"

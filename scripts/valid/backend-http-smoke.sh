@@ -13,7 +13,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Force memory repository for local smoke (no hard dependency on MQTT worker)
+# Force memory repository for local/CI smoke (no hard dependency on MQTT worker)
 sed -e "s/http_port = 8080/http_port = ${PORT}/" -e 's/type = "mqtt_rust"/type = "memory"/' "$ROOT_DIR/config/portal-config.toml" > "$TMP_CFG"
 
 (
@@ -22,7 +22,16 @@ sed -e "s/http_port = 8080/http_port = ${PORT}/" -e 's/type = "mqtt_rust"/type =
   echo $! > /tmp/auth-service-smoke.pid
 )
 PID="$(cat /tmp/auth-service-smoke.pid)"
-sleep 2
+
+# Wait until service is reachable
+for _ in $(seq 1 40); do
+  if curl -sS "http://127.0.0.1:${PORT}/health" >/dev/null 2>&1; then
+    break
+  fi
+  sleep 0.5
+done
+
+curl -sS "http://127.0.0.1:${PORT}/health" >/dev/null
 
 REQ_SUFFIX="$(date +%s)"
 REGISTER_PAYLOAD="{\"template\":\"casa\",\"firstName\":\"Smoke\",\"lastName\":\"Test\",\"email\":\"smoke-${REQ_SUFFIX}@example.com\",\"mobile\":\"+525500001111\",\"password\":\"abc123\"}"

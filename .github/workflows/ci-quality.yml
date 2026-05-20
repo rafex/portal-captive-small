@@ -70,7 +70,6 @@ jobs:
             --scan /src \
             --format HTML \
             --out /report \
-            --noupdate \
             --enableRetired \
             --failOnCVSS 7
 

@@ -61,7 +61,7 @@ for i in $(seq 1 "$CONCURRENCY"); do
   (
     EMAIL="cc-${i}-$(date +%s)-$RANDOM@example.com"
     curl --max-time "$CURL_MAX_TIME" --connect-timeout 2 -sS -X POST "http://127.0.0.1:${HTTP_PORT}/auth/register" -H 'Content-Type: application/json' \
-      -d "{\"template\":\"casa\",\"firstName\":\"C${i}\",\"lastName\":\"T\",\"email\":\"${EMAIL}\",\"mobile\":\"+52557000${i}\",\"password\":\"abc123\"}" >/tmp/cc-${i}.json
+      -d "{\"template\":\"casa\",\"firstName\":\"C${i}\",\"lastName\":\"T\",\"email\":\"${EMAIL}\",\"mobile\":\"+52557000${i}\",\"password\":\"abc123\"}" >"/tmp/cc-${i}.json"
   ) &
 done
 wait

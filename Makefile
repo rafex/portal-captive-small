@@ -10,6 +10,7 @@ validate:
 
 test:
 	$(MAKE) -C scripts/valid run
+	$(MAKE) -C scripts/valid e2e
 
 build:
 	$(MAKE) -C frontend build

@@ -1,15 +1,18 @@
-.PHONY: run mqtt-e2e backend-http-smoke backend-selftest db-mqtt-e2e auth-mqtt-rust-e2e auth-mqtt-rust-concurrency rpi3b-lxc-smoke frontend-test rust-test
+.PHONY: run e2e mqtt-e2e backend-http-smoke backend-selftest db-mqtt-e2e auth-mqtt-rust-e2e auth-mqtt-rust-concurrency rpi3b-lxc-smoke frontend-test rust-test
 
 run: backend-selftest frontend-test rust-test backend-http-smoke
 	@echo "scripts/valid checks"
-	@echo "Skipping mqtt-e2e.sh in default validate (requires external responder stack)"
+	@echo "Quick validate complete (E2E omitted)"
+
+e2e:
+	@echo "scripts/valid e2e checks"
 	@if command -v mosquitto >/dev/null 2>&1 && command -v mosquitto_pub >/dev/null 2>&1 && command -v mosquitto_sub >/dev/null 2>&1; then \
 		echo "Running DB MQTT E2E"; \
-		bash db-mqtt-local-stack.sh; \
+		timeout 180s bash db-mqtt-local-stack.sh; \
 		echo "Running FULL auth-mqtt-rust E2E"; \
-		bash auth-mqtt-rust-e2e.sh; \
+		timeout 180s bash auth-mqtt-rust-e2e.sh; \
 		echo "Running auth-mqtt-rust concurrency"; \
-		bash auth-mqtt-rust-concurrency.sh; \
+		timeout 240s bash auth-mqtt-rust-concurrency.sh; \
 	else \
 		echo "Skipping db/auth-mqtt-rust e2e (mosquitto + clients not installed)"; \
 	fi

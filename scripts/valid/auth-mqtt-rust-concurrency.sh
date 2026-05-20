@@ -38,11 +38,23 @@ sed -e "s/http_port = 8080/http_port = ${HTTP_PORT}/" -e "s/port = 1883/port = $
 
 (
   cd "$ROOT_DIR"
-  java -cp backend/java/portal/services/auth-service/target/auth-service-0.1.0.jar com.portal.auth.AuthApplication "$TMP_CFG" >/tmp/auth-service-concurrency.log 2>&1 &
+  java -cp "backend/java/portal/shared/domain/target/classes:backend/java/portal/services/auth-service/target/classes" \
+    com.portal.auth.AuthApplication "$TMP_CFG" >/tmp/auth-service-concurrency.log 2>&1 &
   echo $! > /tmp/auth-service-concurrency.pid
 )
 JAVA_PID="$(cat /tmp/auth-service-concurrency.pid)"
-sleep 2
+
+for _ in $(seq 1 40); do
+  if ! kill -0 "$JAVA_PID" >/dev/null 2>&1; then
+    echo "auth-service cayó durante arranque. Log:"
+    cat /tmp/auth-service-concurrency.log
+    exit 1
+  fi
+  if curl -sS "http://127.0.0.1:${HTTP_PORT}/health" >/dev/null 2>&1; then
+    break
+  fi
+  sleep 0.5
+done
 
 for i in $(seq 1 "$CONCURRENCY"); do
   (

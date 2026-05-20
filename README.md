@@ -45,6 +45,10 @@ sudo bash scripts/install/rpi3b-direct-install.sh v0.1.0
 ## Artefactos esperados
 - `dist/frontend-<version>.tar.gz`
 - `dist/frontend-<version>.tar.gz.sha256`
+- `dist/frontend-id-build-<version>.tar.gz`
+- `dist/frontend-id-build-<version>.tar.gz.sha256`
+- `dist/frontend-id-build-<version>.zip`
+- `dist/frontend-id-build-<version>.zip.sha256`
 - `dist/backend-<version>-x86_64.tar.gz`
 - `dist/backend-<version>-x86_64.tar.gz.sha256`
 - `dist/backend-<version>-arm64.tar.gz`

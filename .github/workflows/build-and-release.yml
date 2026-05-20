@@ -30,6 +30,10 @@ jobs:
           mkdir -p dist
           tar -czf "dist/frontend-${VERSION}.tar.gz" -C frontend/javascripts/portal dist
           sha256sum "dist/frontend-${VERSION}.tar.gz" > "dist/frontend-${VERSION}.tar.gz.sha256"
+          tar -czf "dist/frontend-id-build-${VERSION}.tar.gz" -C frontend/javascripts/portal dist
+          sha256sum "dist/frontend-id-build-${VERSION}.tar.gz" > "dist/frontend-id-build-${VERSION}.tar.gz.sha256"
+          (cd frontend/javascripts/portal && zip -rq "../../../dist/frontend-id-build-${VERSION}.zip" dist)
+          sha256sum "dist/frontend-id-build-${VERSION}.zip" > "dist/frontend-id-build-${VERSION}.zip.sha256"
 
       - name: Upload frontend artifacts
         uses: actions/upload-artifact@v4

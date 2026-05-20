@@ -4,7 +4,11 @@
 Generar artefactos reproducibles frontend/backend y checksums SHA256 en GitHub Actions.
 
 ## Artefactos
-- frontend `.tar.gz` + `.sha256`
+- frontend para instalación:
+  - `frontend-<version>.tar.gz` + `.sha256`
+- frontend build productivo (Vite):
+  - `frontend-id-build-<version>.tar.gz` + `.sha256`
+  - `frontend-id-build-<version>.zip` + `.sha256`
 - backend por arquitectura:
   - `backend-<version>-x86_64.tar.gz` + `.sha256`
   - `backend-<version>-arm64.tar.gz` + `.sha256`

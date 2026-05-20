@@ -1,4 +1,4 @@
-SUBDIRS := install config valid post-install pre-install build commons
+SUBDIRS := install config valid post-install pre-install build commons git
 
 .PHONY: all $(SUBDIRS)
 

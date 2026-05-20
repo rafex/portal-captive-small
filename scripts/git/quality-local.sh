@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "$ROOT_DIR"
+
+echo "[quality-local] make validate"
+make validate
+
+echo "[quality-local] frontend tests"
+(
+  cd frontend/javascripts/portal
+  npm ci --no-audit --no-fund
+  npm test
+)
+
+echo "[quality-local] rust tests"
+(
+  cd backend/rust/database-conector-sqlite
+  cargo test --quiet
+)
+
+echo "[quality-local] full test suite"
+make test
+
+echo "[quality-local] shellcheck"
+find scripts -type f -name '*.sh' -print0 | xargs -0 -r shellcheck
+
+echo "[quality-local] lizard (if installed)"
+if command -v lizard >/dev/null 2>&1; then
+  lizard backend frontend scripts -x "**/target/**" -x "**/node_modules/**" -x "**/dist/**" -x "**/.git/**" -C 15
+else
+  echo "lizard no está instalado; omitiendo complejidad ciclomática local"
+fi
+
+echo "[quality-local] owasp dependency-check (if available)"
+mkdir -p reports
+if command -v dependency-check >/dev/null 2>&1; then
+  dependency-check --project portal-captive-small --scan . --format HTML --out reports --enableRetired --failOnCVSS 7
+elif command -v docker >/dev/null 2>&1; then
+  docker run --rm \
+    -v "$ROOT_DIR":/src \
+    -v "$ROOT_DIR/reports":/report \
+    owasp/dependency-check:latest \
+    --project portal-captive-small --scan /src --format HTML --out /report --enableRetired --failOnCVSS 7
+else
+  echo "dependency-check/docker no disponible; omitiendo OWASP local"
+fi
+
+echo "[quality-local] OK"

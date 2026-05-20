@@ -17,6 +17,9 @@ package:
 release-local:
     make release-local VERSION={{version}}
 
+install-githooks:
+    bash scripts/git/install-githooks.sh
+
 tag-create tag:
     git tag -a {{tag}} -m "Release {{tag}}"
 

@@ -59,40 +59,6 @@ jobs:
         run: |
           find scripts -type f -name '*.sh' -print0 | xargs -0 -r shellcheck
 
-      - name: Cache OWASP Dependency-Check DB
-        uses: actions/cache@v4
-        with:
-          path: .cache/dependency-check
-          key: dependency-check-${{ runner.os }}-${{ github.ref_name }}
-          restore-keys: |
-            dependency-check-${{ runner.os }}-
-
-      - name: OWASP Dependency Check
-        env:
-          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
-        run: |
-          mkdir -p reports .cache/dependency-check
-          DC_ARGS=(--project "portal-captive-small" --scan /src --format HTML --out /report --enableRetired --failOnCVSS 7 --data /usr/share/dependency-check/data)
-          if [[ -n "${NVD_API_KEY:-}" ]]; then
-            echo "Using NVD API key"
-            DC_ARGS+=(--nvdApiKey "$NVD_API_KEY")
-          else
-            echo "NVD_API_KEY not set; running without API key"
-          fi
-          env -u JAVA_HOME -u JAVA_HOME_21_X64 docker run --rm \
-            -v "${{ github.workspace }}":/src \
-            -v "${{ github.workspace }}/reports":/report \
-            -v "${{ github.workspace }}/.cache/dependency-check":/usr/share/dependency-check/data \
-            owasp/dependency-check:latest \
-            "${DC_ARGS[@]}"
-
-      - name: Upload OWASP report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: owasp-dependency-check-report
-          path: reports/
-
       - name: Cyclomatic Complexity (Lizard)
         run: |
           lizard backend frontend scripts -x "**/target/**" -x "**/node_modules/**" -x "**/dist/**" -x "**/.git/**" -C 15

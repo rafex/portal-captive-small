@@ -22,7 +22,8 @@ Generar artefactos reproducibles frontend/backend y checksums SHA256 en GitHub A
 
 ## Trigger
 - Push de tags `v*`: build + empaquetado + publicación de release.
-- Push/PR a `main` y `develop`: solo validaciones/calidad (sin release).
+- Push/PR a `main` y `develop`: validaciones rápidas/calidad (sin release, sin OWASP).
+- `security-scan`: OWASP Dependency-Check en workflow separado (manual y programado diario).
 
 ## Instalación por curl
 Soporte para ejecución estilo:

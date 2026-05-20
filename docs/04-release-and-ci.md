@@ -5,8 +5,20 @@ Generar artefactos reproducibles frontend/backend y checksums SHA256 en GitHub A
 
 ## Artefactos
 - frontend `.tar.gz` + `.sha256`
-- backend `.tar.gz` + `.sha256`
+- backend por arquitectura:
+  - `backend-<version>-x86_64.tar.gz` + `.sha256`
+  - `backend-<version>-arm64.tar.gz` + `.sha256`
+- `fat-jar` por arquitectura:
+  - `auth-service-fat-<version>-x86_64.jar` + `.sha256`
+  - `auth-service-fat-<version>-arm64.jar` + `.sha256`
+- binario Rust por arquitectura:
+  - `db-mqtt-worker-<version>-x86_64` + `.sha256`
+  - `db-mqtt-worker-<version>-arm64` + `.sha256`
 - `script-install.sh`
+
+## Trigger
+- Push de tags `v*`: build + empaquetado + publicación de release.
+- Push/PR a `main` y `develop`: solo validaciones/calidad (sin release).
 
 ## Instalación por curl
 Soporte para ejecución estilo:

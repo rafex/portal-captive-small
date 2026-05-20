@@ -7,8 +7,9 @@
 
 ## Build de release
 El release se construye en GitHub Actions con:
-- binario nativo GraalVM del `auth-service` para ARMv7 (`auth-service-armv7`)
-- binario Rust ARMv7 (`db-mqtt-worker-armv7`)
+- matrix de runners nativos GitHub (`x86_64` y `arm64`) sin cross-compilación
+- binario nativo GraalVM 25 del `auth-service` por arquitectura (`auth-service-<arch>`)
+- binario Rust `db-mqtt-worker` por arquitectura (`db-mqtt-worker-<arch>`)
 
 No se requiere `openjdk-21-jre-headless` en runtime del contenedor.
 

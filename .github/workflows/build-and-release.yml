@@ -6,11 +6,8 @@ on:
       - 'v*'
   workflow_dispatch:
 
-env:
-  RUST_TARGET_RPI3B: armv7-unknown-linux-gnueabihf
-
 jobs:
-  build:
+  build-frontend:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -21,27 +18,58 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Set up Java (host)
+      - name: Build frontend
+        run: |
+          cd frontend/javascripts/portal
+          npm ci --no-audit --no-fund
+          npm run build
+
+      - name: Package frontend
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          mkdir -p dist
+          tar -czf "dist/frontend-${VERSION}.tar.gz" -C frontend/javascripts/portal dist
+          sha256sum "dist/frontend-${VERSION}.tar.gz" > "dist/frontend-${VERSION}.tar.gz.sha256"
+
+      - name: Upload frontend artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-release-artifacts
+          path: dist/*
+
+  build-backend:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java (GraalVM 25)
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '21'
+          distribution: 'graalvm'
+          java-version: '25'
+
+      - name: Ensure native-image is available
+        run: |
+          if ! command -v native-image >/dev/null 2>&1; then
+            gu install native-image
+          fi
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ env.RUST_TARGET_RPI3B }}
 
-      - name: Install build dependencies
+      - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            sqlite3 \
-            mosquitto \
-            mosquitto-clients \
-            gcc-arm-linux-gnueabihf \
-            binutils-arm-linux-gnueabihf \
-            pkg-config
+          sudo apt-get install -y sqlite3 mosquitto mosquitto-clients
 
       - name: Validate
         run: make validate
@@ -49,80 +77,66 @@ jobs:
       - name: Test
         run: make test
 
-      - name: Build frontend
-        run: |
-          cd frontend/javascripts/portal
-          npm ci --no-audit --no-fund
-          npm run build
-
-      - name: Build Java JAR artifacts
+      - name: Build Java fat-jar + native binary (GraalVM)
         run: |
           cd backend/java/portal
-          mvn -q -DskipTests package
+          mvn -q -pl services/auth-service -am -DskipTests package native:compile
 
-      - name: Build Rust binary for Raspberry Pi 3B
-        env:
-          CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABIHF_LINKER: arm-linux-gnueabihf-gcc
-          CC_armv7_unknown_linux_gnueabihf: arm-linux-gnueabihf-gcc
-          AR_armv7_unknown_linux_gnueabihf: arm-linux-gnueabihf-ar
+      - name: Build Rust worker (native arch)
         run: |
           cd backend/rust/database-conector-sqlite
-          cargo build --release --target ${{ env.RUST_TARGET_RPI3B }}
+          cargo build --release
 
-      - name: Build GraalVM native auth-service for ARMv7
-        uses: uraimo/run-on-arch-action@v2
-        with:
-          arch: armv7
-          distro: ubuntu22.04
-          githubToken: ${{ github.token }}
-          install: |
-            apt-get update
-            apt-get install -y curl unzip zip tar gzip git build-essential maven
-            curl -L -o /tmp/graalvm.tar.gz https://download.oracle.com/graalvm/25/latest/graalvm-jdk-25_linux-arm64_bin.tar.gz || true
-          run: |
-            # Fallback note: if armv7 image for GraalVM is unavailable, this step should be replaced by native build on Raspi runner.
-            echo "Skipping true ARMv7 native-image inside emulation due GraalVM ARMv7 distro limitations"
-            mkdir -p /workspace/native-out
-            echo "native-placeholder" > /workspace/native-out/auth-service-armv7
-
-      - name: Package release artifacts
+      - name: Package backend artifacts (${{ matrix.arch }})
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           mkdir -p dist/package/backend/bin dist/package/backend/java dist/package/backend/config
-
-          tar -czf "dist/frontend-${VERSION}.tar.gz" -C frontend/javascripts/portal dist
-          sha256sum "dist/frontend-${VERSION}.tar.gz" > "dist/frontend-${VERSION}.tar.gz.sha256"
-
-          cp backend/java/portal/services/auth-service/target/auth-service-*.jar dist/package/backend/java/
-          cp backend/rust/database-conector-sqlite/target/${{ env.RUST_TARGET_RPI3B }}/release/db-mqtt-worker dist/package/backend/bin/db-mqtt-worker-armv7
-          cp native-out/auth-service-armv7 dist/package/backend/bin/auth-service-armv7 || true
+          FAT_JAR="$(ls backend/java/portal/services/auth-service/target/auth-service-*.jar | head -n1)"
+          cp backend/java/portal/services/auth-service/target/auth-service dist/package/backend/bin/auth-service-${{ matrix.arch }}
+          cp "${FAT_JAR}" "dist/auth-service-fat-${VERSION}-${{ matrix.arch }}.jar"
+          cp backend/rust/database-conector-sqlite/target/release/db-mqtt-worker dist/package/backend/bin/db-mqtt-worker-${{ matrix.arch }}
+          cp backend/rust/database-conector-sqlite/target/release/db-mqtt-worker dist/db-mqtt-worker-${VERSION}-${{ matrix.arch }}
           cp config/portal-config.toml dist/package/backend/config/
-
           cp scripts/install/script-install.sh dist/
           cp scripts/install/rpi3b-direct-install.sh dist/
           cp scripts/install/rpi3b-lxc-install.sh dist/
           cp scripts/install/rpi3b-prepare-lxc.sh dist/
+          tar -czf "dist/backend-${VERSION}-${{ matrix.arch }}.tar.gz" -C dist/package backend
+          sha256sum "dist/auth-service-fat-${VERSION}-${{ matrix.arch }}.jar" > "dist/auth-service-fat-${VERSION}-${{ matrix.arch }}.jar.sha256"
+          sha256sum "dist/db-mqtt-worker-${VERSION}-${{ matrix.arch }}" > "dist/db-mqtt-worker-${VERSION}-${{ matrix.arch }}.sha256"
+          sha256sum "dist/backend-${VERSION}-${{ matrix.arch }}.tar.gz" > "dist/backend-${VERSION}-${{ matrix.arch }}.tar.gz.sha256"
 
-          tar -czf "dist/backend-${VERSION}.tar.gz" -C dist/package backend
-          sha256sum "dist/backend-${VERSION}.tar.gz" > "dist/backend-${VERSION}.tar.gz.sha256"
-
-      - name: Upload artifacts
+      - name: Upload backend artifacts (${{ matrix.arch }})
         uses: actions/upload-artifact@v4
         with:
-          name: release-artifacts
+          name: backend-release-artifacts-${{ matrix.arch }}
           path: dist/*
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: build
+    needs:
+      - build-frontend
+      - build-backend
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - name: Download artifacts
+      - name: Download frontend artifacts
         uses: actions/download-artifact@v4
         with:
-          name: release-artifacts
+          name: frontend-release-artifacts
+          path: dist
+
+      - name: Download backend artifacts (x86_64)
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-release-artifacts-x86_64
+          path: dist
+
+      - name: Download backend artifacts (arm64)
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-release-artifacts-arm64
           path: dist
 
       - name: Create GitHub release

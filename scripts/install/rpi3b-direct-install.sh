@@ -17,11 +17,12 @@ ROOT_DIR="/opt/portal-captive-small"
 LXC_NAME="${LXC_NAME:-portal-captive}"
 LXC_PATH="${LXC_PATH:-/var/lib/lxc}"
 BROKER_PORT="${BROKER_PORT:-1883}"
+ARCH="${ARCH:-arm64}"
 
 "/opt/portal-captive-small/scripts/install/rpi3b-lxc-install.sh" "$VERSION"
 
 if [[ ! -d "${LXC_PATH}/${LXC_NAME}/rootfs" ]]; then
-  lxc-create -n "$LXC_NAME" -t download -- -d debian -r bookworm -a armhf
+  lxc-create -n "$LXC_NAME" -t download -- -d debian -r bookworm -a "$ARCH"
 fi
 
 if [[ -f "$ROOT_DIR/containers/lxc/portal-captive.conf" ]]; then
@@ -36,12 +37,12 @@ lxc-attach -n "$LXC_NAME" -- bash -lc "apt-get update && apt-get install -y mosq
 lxc-attach -n "$LXC_NAME" -- bash -lc "mkdir -p /opt/portal-captive-small"
 rsync -a --delete "$ROOT_DIR/" "${LXC_PATH}/${LXC_NAME}/rootfs/opt/portal-captive-small/"
 
-lxc-attach -n "$LXC_NAME" -- bash -lc "test -x /opt/portal-captive-small/backend/bin/db-mqtt-worker-armv7"
-lxc-attach -n "$LXC_NAME" -- bash -lc "test -x /opt/portal-captive-small/backend/bin/auth-service-armv7"
+lxc-attach -n "$LXC_NAME" -- bash -lc "test -x /opt/portal-captive-small/backend/bin/db-mqtt-worker-${ARCH}"
+lxc-attach -n "$LXC_NAME" -- bash -lc "test -x /opt/portal-captive-small/backend/bin/auth-service-${ARCH}"
 
 lxc-attach -n "$LXC_NAME" -- bash -lc "pkill mosquitto || true; mosquitto -p ${BROKER_PORT} >/tmp/mosquitto.log 2>&1 &"
-lxc-attach -n "$LXC_NAME" -- bash -lc "pkill db-mqtt-worker-armv7 || true; MQTT_HOST=127.0.0.1 MQTT_PORT=${BROKER_PORT} SQLITE_DB_PATH=/opt/portal-captive-small/data/auth-service.db DB_USER_REQUEST_TOPIC=portal/db/user/request /opt/portal-captive-small/backend/bin/db-mqtt-worker-armv7 >/tmp/db-worker.log 2>&1 &"
-lxc-attach -n "$LXC_NAME" -- bash -lc "pkill auth-service-armv7 || true; cd /opt/portal-captive-small && /opt/portal-captive-small/backend/bin/auth-service-armv7 config/portal-config.toml >/tmp/auth-service.log 2>&1 &"
+lxc-attach -n "$LXC_NAME" -- bash -lc "pkill db-mqtt-worker-${ARCH} || true; MQTT_HOST=127.0.0.1 MQTT_PORT=${BROKER_PORT} SQLITE_DB_PATH=/opt/portal-captive-small/data/auth-service.db DB_USER_REQUEST_TOPIC=portal/db/user/request /opt/portal-captive-small/backend/bin/db-mqtt-worker-${ARCH} >/tmp/db-worker.log 2>&1 &"
+lxc-attach -n "$LXC_NAME" -- bash -lc "pkill auth-service-${ARCH} || true; cd /opt/portal-captive-small && /opt/portal-captive-small/backend/bin/auth-service-${ARCH} config/portal-config.toml >/tmp/auth-service.log 2>&1 &"
 
 sleep 4
 lxc-attach -n "$LXC_NAME" -- curl -sS http://127.0.0.1:8080/health

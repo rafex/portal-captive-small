@@ -45,8 +45,18 @@ sudo bash scripts/install/rpi3b-direct-install.sh v0.1.0
 ## Artefactos esperados
 - `dist/frontend-<version>.tar.gz`
 - `dist/frontend-<version>.tar.gz.sha256`
-- `dist/backend-<version>.tar.gz`
-- `dist/backend-<version>.tar.gz.sha256`
+- `dist/backend-<version>-x86_64.tar.gz`
+- `dist/backend-<version>-x86_64.tar.gz.sha256`
+- `dist/backend-<version>-arm64.tar.gz`
+- `dist/backend-<version>-arm64.tar.gz.sha256`
+- `dist/auth-service-fat-<version>-x86_64.jar`
+- `dist/auth-service-fat-<version>-x86_64.jar.sha256`
+- `dist/auth-service-fat-<version>-arm64.jar`
+- `dist/auth-service-fat-<version>-arm64.jar.sha256`
+- `dist/db-mqtt-worker-<version>-x86_64`
+- `dist/db-mqtt-worker-<version>-x86_64.sha256`
+- `dist/db-mqtt-worker-<version>-arm64`
+- `dist/db-mqtt-worker-<version>-arm64.sha256`
 - `dist/script-install.sh`
 
 ## Documentación

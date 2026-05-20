@@ -1,4 +1,4 @@
-.PHONY: run e2e mqtt-e2e backend-http-smoke backend-selftest db-mqtt-e2e auth-mqtt-rust-e2e auth-mqtt-rust-concurrency rpi3b-lxc-smoke frontend-test rust-test
+.PHONY: run e2e concurrency mqtt-e2e backend-http-smoke backend-selftest db-mqtt-e2e auth-mqtt-rust-e2e auth-mqtt-rust-concurrency rpi3b-lxc-smoke frontend-test rust-test
 
 run: backend-selftest frontend-test rust-test backend-http-smoke
 	@echo "scripts/valid checks"
@@ -11,10 +11,17 @@ e2e:
 		timeout 180s bash db-mqtt-local-stack.sh; \
 		echo "Running FULL auth-mqtt-rust E2E"; \
 		timeout 180s bash auth-mqtt-rust-e2e.sh; \
+	else \
+		echo "Skipping db/auth-mqtt-rust e2e (mosquitto + clients not installed)"; \
+	fi
+
+concurrency:
+	@echo "scripts/valid concurrency checks"
+	@if command -v mosquitto >/dev/null 2>&1 && command -v mosquitto_pub >/dev/null 2>&1 && command -v mosquitto_sub >/dev/null 2>&1; then \
 		echo "Running auth-mqtt-rust concurrency"; \
 		timeout 120s bash auth-mqtt-rust-concurrency.sh; \
 	else \
-		echo "Skipping db/auth-mqtt-rust e2e (mosquitto + clients not installed)"; \
+		echo "Skipping concurrency (mosquitto + clients not installed)"; \
 	fi
 
 backend-selftest:

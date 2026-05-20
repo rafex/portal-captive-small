@@ -34,7 +34,7 @@ just package
 - `just install-githooks`: configura `core.hooksPath=.githooks`.
 - `just uninstall-githooks`: remueve solo la configuración de hooks (no borra archivos).
 - `pre-commit`: ejecuta lint/check rápido por archivos staged (shell/java/rust/frontend).
-- `pre-push`: ejecuta `quality-local`; si detecta push de tags, exige `CHANGE.md` y `RELEASE.md` con el tag (`vX.Y.Z`) presente.
+- `pre-push`: ejecuta `quality-local` (sin OWASP local); si detecta push de tags, exige `CHANGE.md` y `RELEASE.md` con el tag (`vX.Y.Z`) presente.
 
 ## Raspberry Pi 3B (directo)
 1. Preparar host para LXC (borra Docker/Podman):

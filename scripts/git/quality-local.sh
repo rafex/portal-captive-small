@@ -54,18 +54,6 @@ else
   echo "lizard no está instalado; omitiendo complejidad ciclomática local"
 fi
 
-echo "[quality-local] owasp dependency-check (if available)"
-mkdir -p reports
-if command -v dependency-check >/dev/null 2>&1; then
-  dependency-check --project portal-captive-small --scan . --format HTML --out reports --enableRetired --failOnCVSS 7
-elif command -v docker >/dev/null 2>&1; then
-  docker run --rm \
-    -v "$ROOT_DIR":/src \
-    -v "$ROOT_DIR/reports":/report \
-    owasp/dependency-check:latest \
-    --project portal-captive-small --scan /src --format HTML --out /report --enableRetired --failOnCVSS 7
-else
-  echo "dependency-check/docker no disponible; omitiendo OWASP local"
-fi
+echo "[quality-local] OWASP se ejecuta en workflow separado: security-scan"
 
 echo "[quality-local] OK"

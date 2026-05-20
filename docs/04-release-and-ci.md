@@ -31,6 +31,7 @@ Generar artefactos reproducibles frontend/backend y checksums SHA256 en GitHub A
   - cache de DB (`.cache/dependency-check`)
   - fallback de `NVD_API_KEY` (si existe, se usa; si no, continúa sin API key)
   - reporte HTML como artifact.
+- `quality-local`/hooks locales tampoco ejecutan OWASP por defecto.
 
 ## Reglas de tags
 - Antes de push de tag, el hook `pre-push` valida:

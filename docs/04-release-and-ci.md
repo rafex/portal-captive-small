@@ -25,6 +25,18 @@ Generar artefactos reproducibles frontend/backend y checksums SHA256 en GitHub A
 - Push/PR a `main` y `develop`: validaciones rápidas/calidad (sin release, sin OWASP).
 - `security-scan`: OWASP Dependency-Check en workflow separado (manual y programado diario).
 
+## Seguridad (OWASP)
+- `ci-quality` no ejecuta OWASP para evitar latencia y fallos por actualización de base en cada push.
+- OWASP se ejecuta en `security-scan` con:
+  - cache de DB (`.cache/dependency-check`)
+  - fallback de `NVD_API_KEY` (si existe, se usa; si no, continúa sin API key)
+  - reporte HTML como artifact.
+
+## Reglas de tags
+- Antes de push de tag, el hook `pre-push` valida:
+  - existencia de `CHANGE.md` y `RELEASE.md`
+  - presencia del tag (`vX.Y.Z`) en ambos archivos.
+
 ## Instalación por curl
 Soporte para ejecución estilo:
 ```bash

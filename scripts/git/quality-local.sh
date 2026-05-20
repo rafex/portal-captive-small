@@ -1,6 +1,27 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [[ -z "${PORTAL_BASH_BOOTSTRAPPED:-}" ]]; then
+  export PORTAL_BASH_BOOTSTRAPPED=1
+  need_major=5
+  current_major="${BASH_VERSINFO:-0}"
+  if [[ "$current_major" -lt "$need_major" ]]; then
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+      for cand in /opt/homebrew/bin/bash /usr/local/bin/bash; do
+        if [[ -x "$cand" ]]; then
+          exec "$cand" "$0" "$@"
+        fi
+      done
+    else
+      for cand in /usr/bin/bash /bin/bash; do
+        if [[ -x "$cand" ]]; then
+          exec "$cand" "$0" "$@"
+        fi
+      done
+    fi
+  fi
+fi
+
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT_DIR"
 

@@ -22,12 +22,19 @@ Portal cautivo ultraligero para Raspberry Pi 3B, orientado a despliegue reproduc
 ## Inicio rápido
 ```bash
 just install-githooks
+just uninstall-githooks
 just pre-commit-lint
 just validate
 just test
 just build
 just package
 ```
+
+## Git hooks locales
+- `just install-githooks`: configura `core.hooksPath=.githooks`.
+- `just uninstall-githooks`: remueve solo la configuración de hooks (no borra archivos).
+- `pre-commit`: ejecuta lint/check rápido por archivos staged (shell/java/rust/frontend).
+- `pre-push`: ejecuta `quality-local`; si detecta push de tags, exige `CHANGE.md` y `RELEASE.md` con el tag (`vX.Y.Z`) presente.
 
 ## Raspberry Pi 3B (directo)
 1. Preparar host para LXC (borra Docker/Podman):

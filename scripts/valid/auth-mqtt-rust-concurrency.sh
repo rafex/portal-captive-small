@@ -7,6 +7,7 @@ HTTP_PORT="${HTTP_PORT:-18098}"
 DB_PATH="${DB_PATH:-$ROOT_DIR/data/auth-service-concurrency.db}"
 TMP_CFG="$(mktemp)"
 CONCURRENCY="${CONCURRENCY:-10}"
+CURL_MAX_TIME="${CURL_MAX_TIME:-10}"
 
 cleanup() {
   if [[ -n "${JAVA_PID:-}" ]]; then kill "$JAVA_PID" >/dev/null 2>&1 || true; fi
@@ -59,14 +60,14 @@ done
 for i in $(seq 1 "$CONCURRENCY"); do
   (
     EMAIL="cc-${i}-$(date +%s)-$RANDOM@example.com"
-    curl -sS -X POST "http://127.0.0.1:${HTTP_PORT}/auth/register" -H 'Content-Type: application/json' \
+    curl --max-time "$CURL_MAX_TIME" --connect-timeout 2 -sS -X POST "http://127.0.0.1:${HTTP_PORT}/auth/register" -H 'Content-Type: application/json' \
       -d "{\"template\":\"casa\",\"firstName\":\"C${i}\",\"lastName\":\"T\",\"email\":\"${EMAIL}\",\"mobile\":\"+52557000${i}\",\"password\":\"abc123\"}" >/tmp/cc-${i}.json
   ) &
 done
 wait
 
-HEALTH="$(curl -sS "http://127.0.0.1:${HTTP_PORT}/health/db-mqtt")"
-METRICS="$(curl -sS "http://127.0.0.1:${HTTP_PORT}/metrics/db-mqtt")"
+HEALTH="$(curl --max-time "$CURL_MAX_TIME" --connect-timeout 2 -sS "http://127.0.0.1:${HTTP_PORT}/health/db-mqtt")"
+METRICS="$(curl --max-time "$CURL_MAX_TIME" --connect-timeout 2 -sS "http://127.0.0.1:${HTTP_PORT}/metrics/db-mqtt")"
 echo "$HEALTH"
 echo "$METRICS"
 [[ "$HEALTH" == *'"healthy":true'* ]]

@@ -12,7 +12,7 @@ e2e:
 		echo "Running FULL auth-mqtt-rust E2E"; \
 		timeout 180s bash auth-mqtt-rust-e2e.sh; \
 		echo "Running auth-mqtt-rust concurrency"; \
-		timeout 240s bash auth-mqtt-rust-concurrency.sh; \
+		timeout 120s bash auth-mqtt-rust-concurrency.sh; \
 	else \
 		echo "Skipping db/auth-mqtt-rust e2e (mosquitto + clients not installed)"; \
 	fi

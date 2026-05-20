@@ -2,12 +2,7 @@
 
 run: backend-selftest frontend-test rust-test backend-http-smoke
 	@echo "scripts/valid checks"
-	@if command -v mosquitto_pub >/dev/null 2>&1 && command -v mosquitto_sub >/dev/null 2>&1; then \
-		echo "Running MQTT auth E2E"; \
-		bash mqtt-e2e.sh; \
-	else \
-		echo "Skipping mqtt-e2e.sh (mosquitto_pub/sub not installed)"; \
-	fi
+	@echo "Skipping mqtt-e2e.sh in default validate (requires external responder stack)"
 	@if command -v mosquitto >/dev/null 2>&1 && command -v mosquitto_pub >/dev/null 2>&1 && command -v mosquitto_sub >/dev/null 2>&1; then \
 		echo "Running DB MQTT E2E"; \
 		bash db-mqtt-local-stack.sh; \

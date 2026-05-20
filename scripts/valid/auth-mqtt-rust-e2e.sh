@@ -47,11 +47,23 @@ sed \
 
 (
   cd "$ROOT_DIR"
-  java -cp backend/java/portal/services/auth-service/target/auth-service-0.1.0.jar com.portal.auth.AuthApplication "$TMP_CFG" >/tmp/auth-service-mqtt-rust-e2e.log 2>&1 &
+  java -cp "backend/java/portal/shared/domain/target/classes:backend/java/portal/services/auth-service/target/classes" \
+    com.portal.auth.AuthApplication "$TMP_CFG" >/tmp/auth-service-mqtt-rust-e2e.log 2>&1 &
   echo $! > /tmp/auth-service-mqtt-rust-e2e.pid
 )
 JAVA_PID="$(cat /tmp/auth-service-mqtt-rust-e2e.pid)"
-sleep 2
+
+for _ in $(seq 1 40); do
+  if ! kill -0 "$JAVA_PID" >/dev/null 2>&1; then
+    echo "auth-service cayó durante arranque. Log:"
+    cat /tmp/auth-service-mqtt-rust-e2e.log
+    exit 1
+  fi
+  if curl -sS "http://127.0.0.1:${HTTP_PORT}/health" >/dev/null 2>&1; then
+    break
+  fi
+  sleep 0.5
+done
 
 REQ_SUFFIX="$(date +%s)"
 REGISTER_PAYLOAD="{\"template\":\"casa\",\"firstName\":\"E2E\",\"lastName\":\"Rust\",\"email\":\"e2e-${REQ_SUFFIX}@example.com\",\"mobile\":\"+525566677788\",\"password\":\"abc123\"}"

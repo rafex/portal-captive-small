@@ -61,6 +61,9 @@ jobs:
 
       - name: OWASP Dependency Check
         uses: dependency-check/Dependency-Check_Action@main
+        env:
+          JAVA_HOME: ""
+          JAVA_HOME_21_X64: ""
         with:
           project: 'portal-captive-small'
           path: '.'

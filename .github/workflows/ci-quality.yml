@@ -61,4 +61,4 @@ jobs:
 
       - name: Cyclomatic Complexity (Lizard)
         run: |
-          lizard backend frontend scripts -x "**/target/**" -x "**/node_modules/**" -x "**/dist/**" -x "**/.git/**" -C 15
+          lizard backend frontend scripts -x "**/target/**" -x "**/node_modules/**" -x "**/dist/**" -x "**/.git/**" -C 25

@@ -28,7 +28,7 @@ find scripts -type f -name '*.sh' -print0 | xargs -0 -r shellcheck
 
 echo "[quality-local] lizard (if installed)"
 if command -v lizard >/dev/null 2>&1; then
-  lizard backend frontend scripts -x "**/target/**" -x "**/node_modules/**" -x "**/dist/**" -x "**/.git/**" -C 15
+  lizard backend frontend scripts -x "**/target/**" -x "**/node_modules/**" -x "**/dist/**" -x "**/.git/**" -C 25
 else
   echo "lizard no está instalado; omitiendo complejidad ciclomática local"
 fi

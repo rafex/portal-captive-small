@@ -60,16 +60,18 @@ jobs:
           find scripts -type f -name '*.sh' -print0 | xargs -0 -r shellcheck
 
       - name: OWASP Dependency Check
-        uses: dependency-check/Dependency-Check_Action@main
-        env:
-          JAVA_HOME: ""
-          JAVA_HOME_21_X64: ""
-        with:
-          project: 'portal-captive-small'
-          path: '.'
-          format: 'HTML'
-          args: >
-            --enableRetired
+        run: |
+          mkdir -p reports
+          env -u JAVA_HOME -u JAVA_HOME_21_X64 docker run --rm \
+            -v "${{ github.workspace }}":/src \
+            -v "${{ github.workspace }}/reports":/report \
+            owasp/dependency-check:latest \
+            --project "portal-captive-small" \
+            --scan /src \
+            --format HTML \
+            --out /report \
+            --noupdate \
+            --enableRetired \
             --failOnCVSS 7
 
       - name: Upload OWASP report

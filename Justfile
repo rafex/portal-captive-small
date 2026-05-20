@@ -20,6 +20,12 @@ release-local:
 install-githooks:
     bash scripts/git/install-githooks.sh
 
+uninstall-githooks:
+    bash scripts/git/uninstall-githooks.sh
+
+pre-commit-lint:
+    bash scripts/git/pre-commit-lint.sh
+
 tag-create tag:
     git tag -a {{tag}} -m "Release {{tag}}"
 

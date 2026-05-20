@@ -22,6 +22,7 @@ Portal cautivo ultraligero para Raspberry Pi 3B, orientado a despliegue reproduc
 ## Inicio rápido
 ```bash
 just install-githooks
+just pre-commit-lint
 just validate
 just test
 just build

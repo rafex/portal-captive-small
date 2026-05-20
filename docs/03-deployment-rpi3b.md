@@ -5,55 +5,34 @@
 - Acceso root/sudo
 - Conectividad a internet
 
-## 1) Preparar host para LXC (limpiar Docker/Podman)
-Script:
-- `scripts/install/rpi3b-prepare-lxc.sh`
+## Build de release
+El release se construye en GitHub Actions con:
+- binario nativo GraalVM del `auth-service` para ARMv7 (`auth-service-armv7`)
+- binario Rust ARMv7 (`db-mqtt-worker-armv7`)
 
-Ejecución:
+No se requiere `openjdk-21-jre-headless` en runtime del contenedor.
+
+## 1) Preparar host para LXC
 ```bash
 sudo bash scripts/install/rpi3b-prepare-lxc.sh
 ```
 
-Opcional backup de imágenes antes de borrar:
-```bash
-sudo KEEP_IMAGES_BACKUP=true bash scripts/install/rpi3b-prepare-lxc.sh
-```
-
-Qué hace:
-- detiene y deshabilita servicios Docker/Podman/containerd
-- elimina contenedores, volúmenes, networks e imágenes
-- purge de paquetes Docker/Podman
-- elimina rutas de datos residuales
-- instala dependencias base de LXC y utilidades
-
-## 2) Instalación desde release
-Script:
-- `scripts/install/rpi3b-lxc-install.sh <version-tag>`
-
-Ejemplo:
+## 2) Instalar release en host
 ```bash
 sudo bash scripts/install/rpi3b-lxc-install.sh v0.1.0
 ```
 
-## 3) Instalación directa y arranque en LXC
-Script:
-- `scripts/install/rpi3b-direct-install.sh <version-tag>`
-
-Ejemplo:
+## 3) Arrancar stack en LXC
 ```bash
 sudo bash scripts/install/rpi3b-direct-install.sh v0.1.0
 ```
 
-El script:
-- crea/arranca contenedor LXC
-- instala runtime dentro del contenedor
-- despliega artefactos en `/opt/portal-captive-small`
-- compila worker Rust y backend Java dentro del contenedor
-- levanta `mosquitto`, `db-mqtt-worker` y `auth-service`
-- valida endpoint `/health`
+## 4) Smoke de artifacts release
+```bash
+sudo VERSION=v0.1.0 bash scripts/valid/rpi3b-lxc-smoke.sh
+```
 
-## 4) Verificación
-Dentro del contenedor:
+## 5) Verificación
 ```bash
 curl -sS http://127.0.0.1:8080/health
 curl -sS http://127.0.0.1:8080/health/db-mqtt

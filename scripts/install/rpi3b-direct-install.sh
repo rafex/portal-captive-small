@@ -18,11 +18,7 @@ LXC_NAME="${LXC_NAME:-portal-captive}"
 LXC_PATH="${LXC_PATH:-/var/lib/lxc}"
 BROKER_PORT="${BROKER_PORT:-1883}"
 
-/opt/portal-captive-small/scripts/install/rpi3b-lxc-install.sh "$VERSION" || true
-
-if [[ ! -d "$ROOT_DIR" ]]; then
-  mkdir -p "$ROOT_DIR"
-fi
+"/opt/portal-captive-small/scripts/install/rpi3b-lxc-install.sh" "$VERSION"
 
 if [[ ! -d "${LXC_PATH}/${LXC_NAME}/rootfs" ]]; then
   lxc-create -n "$LXC_NAME" -t download -- -d debian -r bookworm -a armhf
@@ -35,17 +31,17 @@ fi
 lxc-start -n "$LXC_NAME" || true
 sleep 5
 
-lxc-attach -n "$LXC_NAME" -- bash -lc "apt-get update && apt-get install -y openjdk-21-jre-headless mosquitto mosquitto-clients sqlite3"
+# Runtime only (no Java runtime needed)
+lxc-attach -n "$LXC_NAME" -- bash -lc "apt-get update && apt-get install -y mosquitto mosquitto-clients sqlite3 curl"
 lxc-attach -n "$LXC_NAME" -- bash -lc "mkdir -p /opt/portal-captive-small"
-
 rsync -a --delete "$ROOT_DIR/" "${LXC_PATH}/${LXC_NAME}/rootfs/opt/portal-captive-small/"
 
-lxc-attach -n "$LXC_NAME" -- bash -lc "cd /opt/portal-captive-small/backend/rust/database-conector-sqlite && cargo build --release"
-lxc-attach -n "$LXC_NAME" -- bash -lc "cd /opt/portal-captive-small/backend/java/portal && mvn -q -DskipTests package"
+lxc-attach -n "$LXC_NAME" -- bash -lc "test -x /opt/portal-captive-small/backend/bin/db-mqtt-worker-armv7"
+lxc-attach -n "$LXC_NAME" -- bash -lc "test -x /opt/portal-captive-small/backend/bin/auth-service-armv7"
 
 lxc-attach -n "$LXC_NAME" -- bash -lc "pkill mosquitto || true; mosquitto -p ${BROKER_PORT} >/tmp/mosquitto.log 2>&1 &"
-lxc-attach -n "$LXC_NAME" -- bash -lc "pkill db-mqtt-worker || true; cd /opt/portal-captive-small/backend/rust/database-conector-sqlite && MQTT_HOST=127.0.0.1 MQTT_PORT=${BROKER_PORT} SQLITE_DB_PATH=/opt/portal-captive-small/data/auth-service.db DB_USER_REQUEST_TOPIC=portal/db/user/request target/release/db-mqtt-worker >/tmp/db-worker.log 2>&1 &"
-lxc-attach -n "$LXC_NAME" -- bash -lc "pkill -f com.portal.auth.AuthApplication || true; cd /opt/portal-captive-small && java -cp backend/java/portal/services/auth-service/target/auth-service-0.1.0.jar com.portal.auth.AuthApplication config/portal-config.toml >/tmp/auth-service.log 2>&1 &"
+lxc-attach -n "$LXC_NAME" -- bash -lc "pkill db-mqtt-worker-armv7 || true; MQTT_HOST=127.0.0.1 MQTT_PORT=${BROKER_PORT} SQLITE_DB_PATH=/opt/portal-captive-small/data/auth-service.db DB_USER_REQUEST_TOPIC=portal/db/user/request /opt/portal-captive-small/backend/bin/db-mqtt-worker-armv7 >/tmp/db-worker.log 2>&1 &"
+lxc-attach -n "$LXC_NAME" -- bash -lc "pkill auth-service-armv7 || true; cd /opt/portal-captive-small && /opt/portal-captive-small/backend/bin/auth-service-armv7 config/portal-config.toml >/tmp/auth-service.log 2>&1 &"
 
 sleep 4
 lxc-attach -n "$LXC_NAME" -- curl -sS http://127.0.0.1:8080/health

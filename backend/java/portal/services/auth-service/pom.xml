@@ -17,4 +17,22 @@
       <version>${project.version}</version>
     </dependency>
   </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.graalvm.buildtools</groupId>
+        <artifactId>native-maven-plugin</artifactId>
+        <version>0.10.2</version>
+        <configuration>
+          <mainClass>com.portal.auth.AuthApplication</mainClass>
+          <imageName>auth-service</imageName>
+          <fallback>false</fallback>
+          <buildArgs>
+            <buildArg>--initialize-at-build-time</buildArg>
+          </buildArgs>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
 </project>

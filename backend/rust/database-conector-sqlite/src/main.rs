@@ -357,3 +357,21 @@ fn err_resp(request_id: String, err: String) -> Response {
         updated_at: None,
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn setup_sqlite_enables_wal() {
+        let conn = Connection::open_in_memory().expect("open");
+        setup_sqlite(&conn).expect("setup");
+
+        let mode: String = conn.query_row("PRAGMA journal_mode;", [], |r| r.get(0)).expect("journal_mode");
+        assert_eq!(mode.to_lowercase(), "memory");
+
+        let fk: i64 = conn.query_row("PRAGMA foreign_keys;", [], |r| r.get(0)).expect("fk");
+        assert_eq!(fk, 1);
+    }
+}

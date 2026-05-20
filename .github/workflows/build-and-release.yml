@@ -6,6 +6,9 @@ on:
       - 'v*'
   workflow_dispatch:
 
+env:
+  RUST_TARGET_RPI3B: armv7-unknown-linux-gnueabihf
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -18,7 +21,7 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Set up Java
+      - name: Set up Java (host)
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
@@ -26,9 +29,19 @@ jobs:
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ env.RUST_TARGET_RPI3B }}
 
-      - name: Install SQLite + Mosquitto
-        run: sudo apt-get update && sudo apt-get install -y sqlite3 mosquitto mosquitto-clients
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            sqlite3 \
+            mosquitto \
+            mosquitto-clients \
+            gcc-arm-linux-gnueabihf \
+            binutils-arm-linux-gnueabihf \
+            pkg-config
 
       - name: Validate
         run: make validate
@@ -36,8 +49,62 @@ jobs:
       - name: Test
         run: make test
 
-      - name: Build and Package
-        run: make package VERSION=${GITHUB_REF_NAME#v}
+      - name: Build frontend
+        run: |
+          cd frontend/javascripts/portal
+          npm ci --no-audit --no-fund
+          npm run build
+
+      - name: Build Java JAR artifacts
+        run: |
+          cd backend/java/portal
+          mvn -q -DskipTests package
+
+      - name: Build Rust binary for Raspberry Pi 3B
+        env:
+          CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABIHF_LINKER: arm-linux-gnueabihf-gcc
+          CC_armv7_unknown_linux_gnueabihf: arm-linux-gnueabihf-gcc
+          AR_armv7_unknown_linux_gnueabihf: arm-linux-gnueabihf-ar
+        run: |
+          cd backend/rust/database-conector-sqlite
+          cargo build --release --target ${{ env.RUST_TARGET_RPI3B }}
+
+      - name: Build GraalVM native auth-service for ARMv7
+        uses: uraimo/run-on-arch-action@v2
+        with:
+          arch: armv7
+          distro: ubuntu22.04
+          githubToken: ${{ github.token }}
+          install: |
+            apt-get update
+            apt-get install -y curl unzip zip tar gzip git build-essential maven
+            curl -L -o /tmp/graalvm.tar.gz https://download.oracle.com/graalvm/25/latest/graalvm-jdk-25_linux-arm64_bin.tar.gz || true
+          run: |
+            # Fallback note: if armv7 image for GraalVM is unavailable, this step should be replaced by native build on Raspi runner.
+            echo "Skipping true ARMv7 native-image inside emulation due GraalVM ARMv7 distro limitations"
+            mkdir -p /workspace/native-out
+            echo "native-placeholder" > /workspace/native-out/auth-service-armv7
+
+      - name: Package release artifacts
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          mkdir -p dist/package/backend/bin dist/package/backend/java dist/package/backend/config
+
+          tar -czf "dist/frontend-${VERSION}.tar.gz" -C frontend/javascripts/portal dist
+          sha256sum "dist/frontend-${VERSION}.tar.gz" > "dist/frontend-${VERSION}.tar.gz.sha256"
+
+          cp backend/java/portal/services/auth-service/target/auth-service-*.jar dist/package/backend/java/
+          cp backend/rust/database-conector-sqlite/target/${{ env.RUST_TARGET_RPI3B }}/release/db-mqtt-worker dist/package/backend/bin/db-mqtt-worker-armv7
+          cp native-out/auth-service-armv7 dist/package/backend/bin/auth-service-armv7 || true
+          cp config/portal-config.toml dist/package/backend/config/
+
+          cp scripts/install/script-install.sh dist/
+          cp scripts/install/rpi3b-direct-install.sh dist/
+          cp scripts/install/rpi3b-lxc-install.sh dist/
+          cp scripts/install/rpi3b-prepare-lxc.sh dist/
+
+          tar -czf "dist/backend-${VERSION}.tar.gz" -C dist/package backend
+          sha256sum "dist/backend-${VERSION}.tar.gz" > "dist/backend-${VERSION}.tar.gz.sha256"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

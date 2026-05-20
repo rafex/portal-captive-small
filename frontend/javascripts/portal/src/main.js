@@ -1,3 +1,5 @@
+import { postJson } from "./api.js";
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8080";
 const OSM_ENDPOINT = "https://nominatim.openstreetmap.org/search";
 
@@ -20,27 +22,6 @@ function setStatus(message, isError = false) {
   if (!statusNode) return;
   statusNode.textContent = message;
   statusNode.style.color = isError ? "#b91c1c" : "#0f766e";
-}
-
-async function postJson(path, payload) {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-
-  let body = {};
-  try {
-    body = await response.json();
-  } catch (_) {
-    body = {};
-  }
-
-  if (!response.ok) {
-    throw new Error(body.error || `http_${response.status}`);
-  }
-
-  return body;
 }
 
 function applyTemplateRules() {
@@ -94,7 +75,7 @@ loginForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
   const data = Object.fromEntries(new FormData(loginForm).entries());
   try {
-    const result = await postJson("/auth/login", {
+    const result = await postJson(API_BASE_URL, "/auth/login", {
       identifier: data.identifier,
       password: data.password,
     });
@@ -108,7 +89,7 @@ registerForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
   const data = Object.fromEntries(new FormData(registerForm).entries());
   try {
-    const result = await postJson("/auth/register", {
+    const result = await postJson(API_BASE_URL, "/auth/register", {
       template: data.template,
       firstName: data.firstName,
       lastName: data.lastName,

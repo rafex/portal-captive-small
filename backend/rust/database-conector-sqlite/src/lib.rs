@@ -9,3 +9,14 @@ pub extern "C" fn sqlite_connector_healthcheck() -> *mut c_char {
         .unwrap_or("error");
     CString::new(status).unwrap().into_raw()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sqlite_healthcheck_returns_non_null() {
+        let ptr = sqlite_connector_healthcheck();
+        assert!(!ptr.is_null());
+    }
+}

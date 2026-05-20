@@ -1,0 +1,81 @@
+name: ci-quality
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y sqlite3 mosquitto mosquitto-clients python3-pip shellcheck
+          python3 -m pip install --user lizard
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Validate
+        run: make validate
+
+      - name: Frontend tests
+        run: |
+          cd frontend/javascripts/portal
+          npm ci --no-audit --no-fund
+          npm test
+
+      - name: Rust tests
+        run: |
+          cd backend/rust/database-conector-sqlite
+          cargo test --quiet
+
+      - name: Full test suite
+        run: make test
+
+      - name: Lint Shell Scripts
+        run: |
+          find scripts -type f -name '*.sh' -print0 | xargs -0 -r shellcheck
+
+      - name: OWASP Dependency Check
+        uses: dependency-check/Dependency-Check_Action@main
+        with:
+          project: 'portal-captive-small'
+          path: '.'
+          format: 'HTML'
+          args: >
+            --enableRetired
+            --failOnCVSS 7
+
+      - name: Upload OWASP report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: owasp-dependency-check-report
+          path: reports/
+
+      - name: Cyclomatic Complexity (Lizard)
+        run: |
+          lizard backend frontend scripts -x "**/target/**" -x "**/node_modules/**" -x "**/dist/**" -x "**/.git/**" -C 15

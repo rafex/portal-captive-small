@@ -26,6 +26,7 @@ fi
 
 ROOT_DIR="/opt/portal-captive-small"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 LXC_NAME="${LXC_NAME:-portal-captive}"
 LXC_PATH="${LXC_PATH:-/var/lib/lxc}"
 BROKER_PORT="${BROKER_PORT:-1883}"
@@ -39,7 +40,9 @@ if [[ -d "${LXC_PATH}/${LXC_NAME}" ]]; then
 fi
 lxc-create -n "$LXC_NAME" -t download -- -d debian -r bookworm -a "$ARCH"
 
-if [[ -f "$ROOT_DIR/containers/lxc/portal-captive.conf" ]]; then
+if [[ -f "$REPO_ROOT/containers/lxc/portal-captive.conf" ]]; then
+  cp "$REPO_ROOT/containers/lxc/portal-captive.conf" "${LXC_PATH}/${LXC_NAME}/config"
+elif [[ -f "$ROOT_DIR/containers/lxc/portal-captive.conf" ]]; then
   cp "$ROOT_DIR/containers/lxc/portal-captive.conf" "${LXC_PATH}/${LXC_NAME}/config"
 fi
 

@@ -27,6 +27,8 @@ pre-commit-lint:
     bash scripts/git/pre-commit-lint.sh
 
 tag-create tag:
+    bash scripts/git/tag-create.sh {{tag}}
+    if ! git diff --quiet -- CHANGE.md RELEASE.md; then git add CHANGE.md RELEASE.md; git commit -m "docs(release): prepare {{tag}}"; fi
     git tag -a {{tag}} -m "Release {{tag}}"
 
 tag-push tag:

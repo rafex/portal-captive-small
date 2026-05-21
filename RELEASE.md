@@ -18,3 +18,6 @@
 
 ## v0.1.6
 - LXC process restart robustness fix for Raspberry Pi deployment scripts.
+
+## v0.1.7
+- Reliable process cleanup in LXC startup scripts (self-PID exclusion).

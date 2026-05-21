@@ -20,3 +20,6 @@
 ## v0.1.6
 - Fix LXC startup script termination issue caused by self-matching process kill patterns.
 - Stabilize direct install and smoke flow for restarting db worker/auth-service processes.
+
+## v0.1.7
+- Fix LXC restart routines to avoid killing current shell when matching process patterns.

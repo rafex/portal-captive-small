@@ -42,8 +42,8 @@ lxc-attach -n "$LXC_NAME" -- bash -lc "test -x /opt/portal-captive-small/backend
 lxc-attach -n "$LXC_NAME" -- bash -lc "test -x /opt/portal-captive-small/backend/bin/auth-service-${ARCH}"
 
 lxc-attach -n "$LXC_NAME" -- bash -lc "pkill -x mosquitto || true"
-lxc-attach -n "$LXC_NAME" -- bash -lc "for p in \$(pgrep -f '/opt/portal-captive-small/backend/bin/db-mqtt-worker-${ARCH}' || true); do kill \"\$p\" || true; done"
-lxc-attach -n "$LXC_NAME" -- bash -lc "for p in \$(pgrep -f '/opt/portal-captive-small/backend/bin/auth-service-${ARCH}' || true); do kill \"\$p\" || true; done"
+lxc-attach -n "$LXC_NAME" -- bash -lc "self=\$\$; for p in \$(pgrep -f '/opt/portal-captive-small/backend/bin/db-mqtt-worker-${ARCH}' || true); do [[ \"\$p\" == \"\$self\" ]] && continue; kill \"\$p\" || true; done"
+lxc-attach -n "$LXC_NAME" -- bash -lc "self=\$\$; for p in \$(pgrep -f '/opt/portal-captive-small/backend/bin/auth-service-${ARCH}' || true); do [[ \"\$p\" == \"\$self\" ]] && continue; kill \"\$p\" || true; done"
 
 lxc-attach -n "$LXC_NAME" -- bash -lc "mosquitto -p ${BROKER_PORT} >/tmp/mosquitto.log 2>&1 &"
 lxc-attach -n "$LXC_NAME" -- bash -lc "MQTT_HOST=127.0.0.1 MQTT_PORT=${BROKER_PORT} SQLITE_DB_PATH=/opt/portal-captive-small/data/auth-service.db DB_USER_REQUEST_TOPIC=portal/db/user/request /opt/portal-captive-small/backend/bin/db-mqtt-worker-${ARCH} >/tmp/db-worker.log 2>&1 &"

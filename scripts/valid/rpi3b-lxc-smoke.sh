@@ -14,11 +14,12 @@ need_cmd lxc-create; need_cmd lxc-start; need_cmd lxc-stop; need_cmd lxc-destroy
 
 dump_debug() {
   set +e
-  lxc-attach -n "$LXC_NAME" -- bash -lc "echo '--- processes'; ps -ef | grep -E 'mosquitto|db-mqtt-worker|auth-service' | grep -v grep || true"
-  lxc-attach -n "$LXC_NAME" -- bash -lc "echo '--- ss 1883/8080'; ss -ltnp | grep -E ':1883|:8080' || true"
+  lxc-attach -n "$LXC_NAME" -- bash -lc "echo '--- processes'; ps -ef | grep -E 'mosquitto|db-mqtt-worker|auth-service|http.server' | grep -v grep || true"
+  lxc-attach -n "$LXC_NAME" -- bash -lc "echo '--- ss 80/1883/8080'; ss -ltnp | grep -E ':80|:1883|:8080' || true"
   lxc-attach -n "$LXC_NAME" -- bash -lc "echo '--- /tmp/mosquitto.log'; tail -n 120 /tmp/mosquitto.log || true"
   lxc-attach -n "$LXC_NAME" -- bash -lc "echo '--- /tmp/db-worker.log'; tail -n 120 /tmp/db-worker.log || true"
   lxc-attach -n "$LXC_NAME" -- bash -lc "echo '--- /tmp/auth-service.log'; tail -n 120 /tmp/auth-service.log || true"
+  lxc-attach -n "$LXC_NAME" -- bash -lc "echo '--- /tmp/frontend.log'; tail -n 120 /tmp/frontend.log || true"
 }
 trap dump_debug ERR
 
@@ -37,7 +38,7 @@ cp "$ROOT_DIR/containers/lxc/portal-captive.conf" "${LXC_PATH}/${LXC_NAME}/confi
 lxc-start -n "$LXC_NAME"
 sleep 5
 
-lxc-attach -n "$LXC_NAME" -- bash -lc "apt-get update && apt-get install -y mosquitto mosquitto-clients sqlite3 curl"
+lxc-attach -n "$LXC_NAME" -- bash -lc "apt-get update && apt-get install -y mosquitto mosquitto-clients sqlite3 curl python3"
 
 bash "$ROOT_DIR/scripts/install/rpi3b-lxc-install.sh" "$VERSION"
 
@@ -53,6 +54,7 @@ lxc-attach -n "$LXC_NAME" -- bash -lc "if pgrep -x mosquitto >/dev/null 2>&1; th
 lxc-attach -n "$LXC_NAME" -- bash -lc "env MQTT_HOST=127.0.0.1 MQTT_PORT=${BROKER_PORT} SQLITE_DB_PATH=/opt/portal-captive-small/data/auth-service.db DB_USER_REQUEST_TOPIC=portal/db/user/request setsid -f /opt/portal-captive-small/backend/bin/db-mqtt-worker-${ARCH} >/tmp/db-worker.log 2>&1 </dev/null; pgrep -f '/opt/portal-captive-small/backend/bin/db-mqtt-worker-${ARCH}' | head -n1 >/run/portal-db-worker.pid"
 lxc-attach -n "$LXC_NAME" -- bash -lc "test -f /opt/portal-captive-small/backend/config/portal-config.toml"
 lxc-attach -n "$LXC_NAME" -- bash -lc "cd /opt/portal-captive-small && setsid -f /opt/portal-captive-small/backend/bin/auth-service-${ARCH} backend/config/portal-config.toml >/tmp/auth-service.log 2>&1 </dev/null; pgrep -f '/opt/portal-captive-small/backend/bin/auth-service-${ARCH}' | head -n1 >/run/portal-auth.pid"
+lxc-attach -n "$LXC_NAME" -- bash -lc "FRONT_DIR=''; for d in /opt/portal-captive-small/dist /opt/portal-captive-small/frontend/dist /opt/portal-captive-small/frontend/javascripts/portal/dist; do if [[ -d \"\$d\" ]] && [[ -f \"\$d/index.html\" ]]; then FRONT_DIR=\"\$d\"; break; fi; done; if [[ -n \"\$FRONT_DIR\" ]]; then cd \"\$FRONT_DIR\" && setsid -f python3 -m http.server 80 >/tmp/frontend.log 2>&1 </dev/null; fi"
 
 sleep 4
 lxc-attach -n "$LXC_NAME" -- bash -lc "kill -0 \$(cat /run/portal-mosquitto.pid) >/dev/null 2>&1"

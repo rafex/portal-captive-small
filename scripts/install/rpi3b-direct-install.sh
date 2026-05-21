@@ -44,15 +44,28 @@ lxc-attach -n "$LXC_NAME" -- bash -lc "test -x /opt/portal-captive-small/backend
 lxc-attach -n "$LXC_NAME" -- bash -lc "test -x /opt/portal-captive-small/backend/bin/auth-service-${ARCH}"
 
 lxc-attach -n "$LXC_NAME" -- bash -lc "pkill -x mosquitto || true"
-lxc-attach -n "$LXC_NAME" -- bash -lc "self=\$\$; for p in \$(pgrep -f '/opt/portal-captive-small/backend/bin/db-mqtt-worker-${ARCH}' || true); do [[ \"\$p\" == \"\$self\" ]] && continue; kill \"\$p\" || true; done"
-lxc-attach -n "$LXC_NAME" -- bash -lc "self=\$\$; for p in \$(pgrep -f '/opt/portal-captive-small/backend/bin/auth-service-${ARCH}' || true); do [[ \"\$p\" == \"\$self\" ]] && continue; kill \"\$p\" || true; done"
+lxc-attach -n "$LXC_NAME" -- bash -lc "pkill -f '/opt/portal-captive-small/backend/bin/db-mqtt-worker-${ARCH}' || true"
+lxc-attach -n "$LXC_NAME" -- bash -lc "pkill -f '/opt/portal-captive-small/backend/bin/auth-service-${ARCH}' || true"
 
+lxc-attach -n "$LXC_NAME" -- bash -lc "rm -f /tmp/mosquitto.log /tmp/db-worker.log /tmp/auth-service.log; touch /tmp/mosquitto.log /tmp/db-worker.log /tmp/auth-service.log"
 lxc-attach -n "$LXC_NAME" -- bash -lc "mosquitto -p ${BROKER_PORT} >/tmp/mosquitto.log 2>&1 &"
 lxc-attach -n "$LXC_NAME" -- bash -lc "MQTT_HOST=127.0.0.1 MQTT_PORT=${BROKER_PORT} SQLITE_DB_PATH=/opt/portal-captive-small/data/auth-service.db DB_USER_REQUEST_TOPIC=portal/db/user/request /opt/portal-captive-small/backend/bin/db-mqtt-worker-${ARCH} >/tmp/db-worker.log 2>&1 &"
-lxc-attach -n "$LXC_NAME" -- bash -lc "cd /opt/portal-captive-small && /opt/portal-captive-small/backend/bin/auth-service-${ARCH} config/portal-config.toml >/tmp/auth-service.log 2>&1 &"
+lxc-attach -n "$LXC_NAME" -- bash -lc "test -f /opt/portal-captive-small/backend/config/portal-config.toml"
+lxc-attach -n "$LXC_NAME" -- bash -lc "cd /opt/portal-captive-small && /opt/portal-captive-small/backend/bin/auth-service-${ARCH} backend/config/portal-config.toml >/tmp/auth-service.log 2>&1 &"
 
 sleep 4
-lxc-attach -n "$LXC_NAME" -- curl -sS http://127.0.0.1:8080/health
+
+lxc-attach -n "$LXC_NAME" -- bash -lc "pgrep -x mosquitto >/dev/null"
+lxc-attach -n "$LXC_NAME" -- bash -lc "pgrep -f '/opt/portal-captive-small/backend/bin/db-mqtt-worker-${ARCH}' >/dev/null"
+lxc-attach -n "$LXC_NAME" -- bash -lc "pgrep -f '/opt/portal-captive-small/backend/bin/auth-service-${ARCH}' >/dev/null"
+
+if ! lxc-attach -n "$LXC_NAME" -- curl -sS http://127.0.0.1:8080/health >/dev/null; then
+  echo "Healthcheck falló, mostrando logs:"
+  lxc-attach -n "$LXC_NAME" -- bash -lc "echo '--- /tmp/mosquitto.log'; tail -n 120 /tmp/mosquitto.log || true"
+  lxc-attach -n "$LXC_NAME" -- bash -lc "echo '--- /tmp/db-worker.log'; tail -n 120 /tmp/db-worker.log || true"
+  lxc-attach -n "$LXC_NAME" -- bash -lc "echo '--- /tmp/auth-service.log'; tail -n 120 /tmp/auth-service.log || true"
+  exit 1
+fi
 
 echo
 echo "Instalación directa completada en Raspberry Pi 3B + LXC (${LXC_NAME})"

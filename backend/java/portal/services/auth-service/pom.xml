@@ -52,6 +52,7 @@
           <fallback>false</fallback>
           <buildArgs>
             <buildArg>--initialize-at-build-time</buildArg>
+            <buildArg>--march=compatibility</buildArg>
           </buildArgs>
         </configuration>
       </plugin>

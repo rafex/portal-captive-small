@@ -8,3 +8,7 @@
 
 ## v0.1.3
 - Release artifacts for Raspberry Pi/LXC deployment updates.
+
+## v0.1.4
+- Raspberry Pi 3B installation reliability update for LXC runtime startup.
+- Native-image compatibility tuning for ARM deployment targets.

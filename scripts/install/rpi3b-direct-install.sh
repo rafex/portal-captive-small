@@ -45,19 +45,30 @@ lxc-attach -n "$LXC_NAME" -- bash -lc "test -x /opt/portal-captive-small/backend
 lxc-attach -n "$LXC_NAME" -- bash -lc "test -x /opt/portal-captive-small/backend/bin/auth-service-${ARCH}"
 
 lxc-attach -n "$LXC_NAME" -- bash -lc "rm -f /tmp/mosquitto.log /tmp/db-worker.log /tmp/auth-service.log; touch /tmp/mosquitto.log /tmp/db-worker.log /tmp/auth-service.log"
-lxc-attach -n "$LXC_NAME" -- bash -lc "nohup mosquitto -p ${BROKER_PORT} >/tmp/mosquitto.log 2>&1 </dev/null &"
-lxc-attach -n "$LXC_NAME" -- bash -lc "nohup env MQTT_HOST=127.0.0.1 MQTT_PORT=${BROKER_PORT} SQLITE_DB_PATH=/opt/portal-captive-small/data/auth-service.db DB_USER_REQUEST_TOPIC=portal/db/user/request /opt/portal-captive-small/backend/bin/db-mqtt-worker-${ARCH} >/tmp/db-worker.log 2>&1 </dev/null &"
+lxc-attach -n "$LXC_NAME" -- bash -lc "rm -f /run/portal-mosquitto.pid /run/portal-db-worker.pid /run/portal-auth.pid"
+lxc-attach -n "$LXC_NAME" -- bash -lc "nohup mosquitto -p ${BROKER_PORT} >/tmp/mosquitto.log 2>&1 </dev/null & echo \$! >/run/portal-mosquitto.pid"
+lxc-attach -n "$LXC_NAME" -- bash -lc "nohup env MQTT_HOST=127.0.0.1 MQTT_PORT=${BROKER_PORT} SQLITE_DB_PATH=/opt/portal-captive-small/data/auth-service.db DB_USER_REQUEST_TOPIC=portal/db/user/request /opt/portal-captive-small/backend/bin/db-mqtt-worker-${ARCH} >/tmp/db-worker.log 2>&1 </dev/null & echo \$! >/run/portal-db-worker.pid"
 lxc-attach -n "$LXC_NAME" -- bash -lc "test -f /opt/portal-captive-small/backend/config/portal-config.toml"
-lxc-attach -n "$LXC_NAME" -- bash -lc "cd /opt/portal-captive-small && nohup /opt/portal-captive-small/backend/bin/auth-service-${ARCH} backend/config/portal-config.toml >/tmp/auth-service.log 2>&1 </dev/null &"
+lxc-attach -n "$LXC_NAME" -- bash -lc "cd /opt/portal-captive-small && nohup /opt/portal-captive-small/backend/bin/auth-service-${ARCH} backend/config/portal-config.toml >/tmp/auth-service.log 2>&1 </dev/null & echo \$! >/run/portal-auth.pid"
 
 sleep 4
 
-lxc-attach -n "$LXC_NAME" -- bash -lc "pgrep -x mosquitto >/dev/null"
-lxc-attach -n "$LXC_NAME" -- bash -lc "pgrep -f '/opt/portal-captive-small/backend/bin/db-mqtt-worker-${ARCH}' >/dev/null"
-lxc-attach -n "$LXC_NAME" -- bash -lc "pgrep -f '/opt/portal-captive-small/backend/bin/auth-service-${ARCH}' >/dev/null"
+lxc-attach -n "$LXC_NAME" -- bash -lc "kill -0 \$(cat /run/portal-mosquitto.pid) >/dev/null 2>&1"
+lxc-attach -n "$LXC_NAME" -- bash -lc "kill -0 \$(cat /run/portal-db-worker.pid) >/dev/null 2>&1"
+lxc-attach -n "$LXC_NAME" -- bash -lc "kill -0 \$(cat /run/portal-auth.pid) >/dev/null 2>&1"
 
-if ! lxc-attach -n "$LXC_NAME" -- curl -sS http://127.0.0.1:8080/health >/dev/null; then
+HEALTH_OK=0
+for _ in $(seq 1 20); do
+  if lxc-attach -n "$LXC_NAME" -- curl -sS http://127.0.0.1:8080/health >/dev/null 2>&1; then
+    HEALTH_OK=1
+    break
+  fi
+  sleep 1
+done
+if [[ "$HEALTH_OK" -ne 1 ]]; then
   echo "Healthcheck falló, mostrando logs:"
+  lxc-attach -n "$LXC_NAME" -- bash -lc "echo '--- processes'; ps -ef | grep -E 'mosquitto|db-mqtt-worker|auth-service' | grep -v grep || true"
+  lxc-attach -n "$LXC_NAME" -- bash -lc "echo '--- ss 8080'; ss -ltnp | grep 8080 || true"
   lxc-attach -n "$LXC_NAME" -- bash -lc "echo '--- /tmp/mosquitto.log'; tail -n 120 /tmp/mosquitto.log || true"
   lxc-attach -n "$LXC_NAME" -- bash -lc "echo '--- /tmp/db-worker.log'; tail -n 120 /tmp/db-worker.log || true"
   lxc-attach -n "$LXC_NAME" -- bash -lc "echo '--- /tmp/auth-service.log'; tail -n 120 /tmp/auth-service.log || true"

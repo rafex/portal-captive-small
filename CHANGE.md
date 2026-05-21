@@ -16,3 +16,7 @@
 
 ## v0.1.5
 - Fix GraalVM native-image flag for ARM compatibility build (`-march=compatibility`).
+
+## v0.1.6
+- Fix LXC startup script termination issue caused by self-matching process kill patterns.
+- Stabilize direct install and smoke flow for restarting db worker/auth-service processes.

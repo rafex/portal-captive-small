@@ -15,3 +15,6 @@
 
 ## v0.1.5
 - Release with corrected GraalVM ARM native-image build flag.
+
+## v0.1.6
+- LXC process restart robustness fix for Raspberry Pi deployment scripts.

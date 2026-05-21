@@ -13,3 +13,6 @@
 - Fix Raspberry Pi LXC startup: ensure SQLite data directory exists before Rust worker starts.
 - Improve LXC service restart sequence for mosquitto, Rust worker, and auth-service.
 - Build auth-service native image with compatibility CPU target for broader ARM support.
+
+## v0.1.5
+- Fix GraalVM native-image flag for ARM compatibility build (`-march=compatibility`).

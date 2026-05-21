@@ -12,3 +12,6 @@
 ## v0.1.4
 - Raspberry Pi 3B installation reliability update for LXC runtime startup.
 - Native-image compatibility tuning for ARM deployment targets.
+
+## v0.1.5
+- Release with corrected GraalVM ARM native-image build flag.

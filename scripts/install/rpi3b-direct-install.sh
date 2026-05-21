@@ -14,12 +14,13 @@ if [[ -z "$VERSION" ]]; then
 fi
 
 ROOT_DIR="/opt/portal-captive-small"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LXC_NAME="${LXC_NAME:-portal-captive}"
 LXC_PATH="${LXC_PATH:-/var/lib/lxc}"
 BROKER_PORT="${BROKER_PORT:-1883}"
 ARCH="${ARCH:-arm64}"
 
-"/opt/portal-captive-small/scripts/install/rpi3b-lxc-install.sh" "$VERSION"
+"${SCRIPT_DIR}/rpi3b-lxc-install.sh" "$VERSION"
 
 if [[ ! -d "${LXC_PATH}/${LXC_NAME}/rootfs" ]]; then
   lxc-create -n "$LXC_NAME" -t download -- -d debian -r bookworm -a "$ARCH"

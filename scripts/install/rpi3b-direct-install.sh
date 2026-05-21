@@ -31,6 +31,8 @@ LXC_NAME="${LXC_NAME:-portal-captive}"
 LXC_PATH="${LXC_PATH:-/var/lib/lxc}"
 BROKER_PORT="${BROKER_PORT:-1883}"
 ARCH="${ARCH:-arm64}"
+CT_IP="${CT_IP:-10.0.3.15}"
+CT_GW="${CT_GW:-10.0.3.1}"
 
 "${SCRIPT_DIR}/rpi3b-lxc-install.sh" "$VERSION"
 
@@ -46,6 +48,18 @@ elif [[ -f "$ROOT_DIR/containers/lxc/portal-captive.conf" ]]; then
   cp "$ROOT_DIR/containers/lxc/portal-captive.conf" "${LXC_PATH}/${LXC_NAME}/config"
 fi
 
+# Enforce static IPv4 in effective LXC config (defensive against older release artifacts).
+if grep -q '^lxc.net.0.ipv4.address' "${LXC_PATH}/${LXC_NAME}/config"; then
+  sed -i "s|^lxc.net.0.ipv4.address.*|lxc.net.0.ipv4.address = ${CT_IP}/24|" "${LXC_PATH}/${LXC_NAME}/config"
+else
+  echo "lxc.net.0.ipv4.address = ${CT_IP}/24" >> "${LXC_PATH}/${LXC_NAME}/config"
+fi
+if grep -q '^lxc.net.0.ipv4.gateway' "${LXC_PATH}/${LXC_NAME}/config"; then
+  sed -i "s|^lxc.net.0.ipv4.gateway.*|lxc.net.0.ipv4.gateway = ${CT_GW}|" "${LXC_PATH}/${LXC_NAME}/config"
+else
+  echo "lxc.net.0.ipv4.gateway = ${CT_GW}" >> "${LXC_PATH}/${LXC_NAME}/config"
+fi
+
 lxc-start -n "$LXC_NAME"
 sleep 5
 
@@ -53,6 +67,16 @@ sleep 5
 lxc-attach -n "$LXC_NAME" -- bash -lc "apt-get update && apt-get install -y mosquitto mosquitto-clients sqlite3 curl python3"
 lxc-attach -n "$LXC_NAME" -- bash -lc "mkdir -p /opt/portal-captive-small /opt/portal-captive-small/data"
 rsync -a --delete "$ROOT_DIR/" "${LXC_PATH}/${LXC_NAME}/rootfs/opt/portal-captive-small/"
+lxc-attach -n "$LXC_NAME" -- bash -lc "cat >/etc/network/interfaces <<'EOF'
+auto lo
+iface lo inet loopback
+
+auto eth0
+iface eth0 inet static
+    address ${CT_IP}/24
+    gateway ${CT_GW}
+    dns-nameservers 1.1.1.1 8.8.8.8
+EOF"
 lxc-attach -n "$LXC_NAME" -- bash -lc "mkdir -p /opt/portal-captive-small/data && touch /opt/portal-captive-small/data/auth-service.db && chmod 775 /opt/portal-captive-small/data && chmod 664 /opt/portal-captive-small/data/auth-service.db"
 
 lxc-attach -n "$LXC_NAME" -- bash -lc "test -x /opt/portal-captive-small/backend/bin/db-mqtt-worker-${ARCH}"

@@ -10,15 +10,17 @@ VERSION="${VERSION:-v0.1.0}"
 ARCH="${ARCH:-arm64}"
 
 need_cmd() { command -v "$1" >/dev/null 2>&1 || { echo "Falta comando: $1"; exit 1; }; }
-need_cmd lxc-create; need_cmd lxc-start; need_cmd lxc-stop; need_cmd lxc-attach; need_cmd curl; need_cmd rsync
+need_cmd lxc-create; need_cmd lxc-start; need_cmd lxc-stop; need_cmd lxc-destroy; need_cmd lxc-attach; need_cmd curl; need_cmd rsync
 
 cleanup() { set +e; lxc-stop -n "$LXC_NAME" >/dev/null 2>&1 || true; }
 trap cleanup EXIT
 
-if [[ ! -d "$ROOTFS" ]]; then
-  echo "Creando contenedor LXC $LXC_NAME"
-  lxc-create -n "$LXC_NAME" -t download -- -d debian -r bookworm -a "$ARCH"
+if [[ -d "${LXC_PATH}/${LXC_NAME}" ]]; then
+  lxc-stop -n "$LXC_NAME" >/dev/null 2>&1 || true
+  lxc-destroy -n "$LXC_NAME" >/dev/null 2>&1 || true
 fi
+echo "Creando contenedor LXC $LXC_NAME"
+lxc-create -n "$LXC_NAME" -t download -- -d debian -r bookworm -a "$ARCH"
 
 cp "$ROOT_DIR/containers/lxc/portal-captive.conf" "${LXC_PATH}/${LXC_NAME}/config"
 

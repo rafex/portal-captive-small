@@ -23,3 +23,6 @@
 
 ## v0.1.7
 - Fix LXC restart routines to avoid killing current shell when matching process patterns.
+
+## v0.1.8
+- Force LXC container recreation on each direct-install and smoke run for deterministic clean state.

@@ -21,3 +21,6 @@
 
 ## v0.1.7
 - Reliable process cleanup in LXC startup scripts (self-PID exclusion).
+
+## v0.1.8
+- Deterministic LXC deploy: container is destroyed/recreated on each install run.

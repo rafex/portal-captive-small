@@ -22,15 +22,17 @@ ARCH="${ARCH:-arm64}"
 
 "${SCRIPT_DIR}/rpi3b-lxc-install.sh" "$VERSION"
 
-if [[ ! -d "${LXC_PATH}/${LXC_NAME}/rootfs" ]]; then
-  lxc-create -n "$LXC_NAME" -t download -- -d debian -r bookworm -a "$ARCH"
+if [[ -d "${LXC_PATH}/${LXC_NAME}" ]]; then
+  lxc-stop -n "$LXC_NAME" >/dev/null 2>&1 || true
+  lxc-destroy -n "$LXC_NAME" >/dev/null 2>&1 || true
 fi
+lxc-create -n "$LXC_NAME" -t download -- -d debian -r bookworm -a "$ARCH"
 
 if [[ -f "$ROOT_DIR/containers/lxc/portal-captive.conf" ]]; then
   cp "$ROOT_DIR/containers/lxc/portal-captive.conf" "${LXC_PATH}/${LXC_NAME}/config"
 fi
 
-lxc-start -n "$LXC_NAME" || true
+lxc-start -n "$LXC_NAME"
 sleep 5
 
 # Runtime only (no Java runtime needed)

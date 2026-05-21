@@ -11,6 +11,12 @@ CT_IP="${CT_IP:-10.0.3.15}"
 CT_NET="${CT_NET:-10.0.3.0/24}"
 LXC_IF="${LXC_IF:-lxcbr0}"
 
+# Accept both plain values (eth0) and key=value forms (ext_if=eth0).
+EXT_IF="${EXT_IF#*=}"
+CT_IP="${CT_IP#*=}"
+CT_NET="${CT_NET#*=}"
+LXC_IF="${LXC_IF#*=}"
+
 if ! command -v ufw >/dev/null 2>&1; then
   echo "Falta ufw. Instala primero: apt-get install -y ufw"
   exit 1

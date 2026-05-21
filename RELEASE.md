@@ -5,3 +5,6 @@
 
 ## v0.1.1
 - Improved release packaging, GitHub workflows, and local hook automation.
+
+## v0.1.3
+- Release artifacts for Raspberry Pi/LXC deployment updates.

@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-IN_HEALTH_RETRY=0
-
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 LXC_NAME="${LXC_NAME:-portal-captive}"
 LXC_PATH="${LXC_PATH:-/var/lib/lxc}"
@@ -15,9 +13,6 @@ need_cmd() { command -v "$1" >/dev/null 2>&1 || { echo "Falta comando: $1"; exit
 need_cmd lxc-create; need_cmd lxc-start; need_cmd lxc-stop; need_cmd lxc-destroy; need_cmd lxc-attach; need_cmd curl; need_cmd rsync
 
 dump_debug() {
-  if [[ "${IN_HEALTH_RETRY:-0}" == "1" ]]; then
-    return 0
-  fi
   set +e
   lxc-attach -n "$LXC_NAME" -- bash -lc "echo '--- processes'; ps -ef | grep -E 'mosquitto|db-mqtt-worker|auth-service|http.server' | grep -v grep || true"
   lxc-attach -n "$LXC_NAME" -- bash -lc "echo '--- ss 80/1883/8080'; ss -ltnp | grep -E ':80|:1883|:8080' || true"
@@ -26,7 +21,6 @@ dump_debug() {
   lxc-attach -n "$LXC_NAME" -- bash -lc "echo '--- /tmp/auth-service.log'; tail -n 120 /tmp/auth-service.log || true"
   lxc-attach -n "$LXC_NAME" -- bash -lc "echo '--- /tmp/frontend.log'; tail -n 120 /tmp/frontend.log || true"
 }
-trap dump_debug ERR
 
 cleanup() { set +e; lxc-stop -n "$LXC_NAME" >/dev/null 2>&1 || true; }
 trap cleanup EXIT
@@ -63,10 +57,8 @@ lxc-attach -n "$LXC_NAME" -- bash -lc "FRONT_DIR=''; for d in /opt/portal-captiv
 
 sleep 4
 lxc-attach -n "$LXC_NAME" -- bash -lc "kill -0 \$(cat /run/portal-mosquitto.pid) >/dev/null 2>&1"
-IN_HEALTH_RETRY=1
 RESP_HEALTH="$(lxc-attach -n "$LXC_NAME" -- curl -sS http://127.0.0.1:8080/health)"
 RESP_DB_HEALTH="$(lxc-attach -n "$LXC_NAME" -- curl -sS http://127.0.0.1:8080/health/db-mqtt)"
-IN_HEALTH_RETRY=0
 [[ "$RESP_HEALTH" == *'"status":"ok"'* ]]
 [[ "$RESP_DB_HEALTH" == *'"healthy":true'* ]]
 

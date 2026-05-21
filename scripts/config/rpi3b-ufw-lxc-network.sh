@@ -34,26 +34,40 @@ sed -i 's/^DEFAULT_FORWARD_POLICY=.*/DEFAULT_FORWARD_POLICY="ACCEPT"/' /etc/defa
 grep -q '^net/ipv4/ip_forward=1' /etc/ufw/sysctl.conf || echo 'net/ipv4/ip_forward=1' >> /etc/ufw/sysctl.conf
 sysctl -w net.ipv4.ip_forward=1 >/dev/null
 
-# NAT block for LXC network + DNAT publish 80->container:80 (idempotent)
-if ! grep -q "PREROUTING -i ${EXT_IF} -p tcp --dport 80 -j DNAT --to-destination ${CT_IP}:80" /etc/ufw/before.rules; then
-  awk -v ct_net="$CT_NET" -v ext_if="$EXT_IF" -v ct_ip="$CT_IP" '
-    BEGIN{inserted=0}
-    {
-      if (!inserted && $0 ~ /^\*filter$/) {
-        print "*nat"
-        print ":PREROUTING ACCEPT [0:0]"
-        print ":POSTROUTING ACCEPT [0:0]"
-        print "-A PREROUTING -i " ext_if " -p tcp --dport 80 -j DNAT --to-destination " ct_ip ":80"
-        print "-A POSTROUTING -s " ct_net " -o " ext_if " -j MASQUERADE"
-        print "COMMIT"
-        print ""
-        inserted=1
-      }
-      print $0
+# Rebuild NAT block to avoid malformed or duplicated legacy entries.
+cp /etc/ufw/before.rules /etc/ufw/before.rules.bak
+awk '
+  BEGIN { in_nat=0 }
+  /^\*nat$/ { in_nat=1; next }
+  {
+    if (in_nat) {
+      if ($0 == "COMMIT") { in_nat=0; next }
+      next
     }
-  ' /etc/ufw/before.rules > /tmp/before.rules.new
-  mv /tmp/before.rules.new /etc/ufw/before.rules
-fi
+    if ($0 ~ /ct_ip=/) next
+    print $0
+  }
+' /etc/ufw/before.rules.bak > /tmp/before.rules.clean
+
+awk -v ct_net="$CT_NET" -v ext_if="$EXT_IF" -v ct_ip="$CT_IP" '
+  BEGIN { inserted=0 }
+  {
+    if (!inserted && $0 ~ /^\*filter$/) {
+      print "*nat"
+      print ":PREROUTING ACCEPT [0:0]"
+      print ":POSTROUTING ACCEPT [0:0]"
+      print "-A PREROUTING -i " ext_if " -p tcp --dport 80 -j DNAT --to-destination " ct_ip ":80"
+      print "-A POSTROUTING -s " ct_net " -o " ext_if " -j MASQUERADE"
+      print "COMMIT"
+      print ""
+      inserted=1
+    }
+    print $0
+  }
+' /tmp/before.rules.clean > /tmp/before.rules.new
+
+mv /tmp/before.rules.new /etc/ufw/before.rules
+rm -f /tmp/before.rules.clean
 
 # UFW rules
 ufw allow 22/tcp

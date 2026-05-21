@@ -1,6 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+dump_debug() {
+  set +e
+  echo "Fallo detectado, diagnóstico LXC:"
+  lxc-attach -n "${LXC_NAME:-portal-captive}" -- bash -lc "echo '--- processes'; ps -ef | grep -E 'mosquitto|db-mqtt-worker|auth-service' | grep -v grep || true"
+  lxc-attach -n "${LXC_NAME:-portal-captive}" -- bash -lc "echo '--- ss 1883/8080'; ss -ltnp | grep -E ':1883|:8080' || true"
+  lxc-attach -n "${LXC_NAME:-portal-captive}" -- bash -lc "echo '--- /tmp/mosquitto.log'; tail -n 120 /tmp/mosquitto.log || true"
+  lxc-attach -n "${LXC_NAME:-portal-captive}" -- bash -lc "echo '--- /tmp/db-worker.log'; tail -n 120 /tmp/db-worker.log || true"
+  lxc-attach -n "${LXC_NAME:-portal-captive}" -- bash -lc "echo '--- /tmp/auth-service.log'; tail -n 120 /tmp/auth-service.log || true"
+}
+trap dump_debug ERR
+
 if [[ "${EUID}" -ne 0 ]]; then
   echo "Este script debe ejecutarse como root (sudo)."
   exit 1
@@ -54,8 +65,6 @@ lxc-attach -n "$LXC_NAME" -- bash -lc "cd /opt/portal-captive-small && nohup /op
 sleep 4
 
 lxc-attach -n "$LXC_NAME" -- bash -lc "kill -0 \$(cat /run/portal-mosquitto.pid) >/dev/null 2>&1"
-lxc-attach -n "$LXC_NAME" -- bash -lc "kill -0 \$(cat /run/portal-db-worker.pid) >/dev/null 2>&1"
-lxc-attach -n "$LXC_NAME" -- bash -lc "kill -0 \$(cat /run/portal-auth.pid) >/dev/null 2>&1"
 
 HEALTH_OK=0
 for _ in $(seq 1 20); do
@@ -66,12 +75,8 @@ for _ in $(seq 1 20); do
   sleep 1
 done
 if [[ "$HEALTH_OK" -ne 1 ]]; then
-  echo "Healthcheck falló, mostrando logs:"
-  lxc-attach -n "$LXC_NAME" -- bash -lc "echo '--- processes'; ps -ef | grep -E 'mosquitto|db-mqtt-worker|auth-service' | grep -v grep || true"
-  lxc-attach -n "$LXC_NAME" -- bash -lc "echo '--- ss 8080'; ss -ltnp | grep 8080 || true"
-  lxc-attach -n "$LXC_NAME" -- bash -lc "echo '--- /tmp/mosquitto.log'; tail -n 120 /tmp/mosquitto.log || true"
-  lxc-attach -n "$LXC_NAME" -- bash -lc "echo '--- /tmp/db-worker.log'; tail -n 120 /tmp/db-worker.log || true"
-  lxc-attach -n "$LXC_NAME" -- bash -lc "echo '--- /tmp/auth-service.log'; tail -n 120 /tmp/auth-service.log || true"
+  echo "Healthcheck falló"
+  dump_debug
   exit 1
 fi
 

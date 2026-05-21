@@ -12,6 +12,16 @@ ARCH="${ARCH:-arm64}"
 need_cmd() { command -v "$1" >/dev/null 2>&1 || { echo "Falta comando: $1"; exit 1; }; }
 need_cmd lxc-create; need_cmd lxc-start; need_cmd lxc-stop; need_cmd lxc-destroy; need_cmd lxc-attach; need_cmd curl; need_cmd rsync
 
+dump_debug() {
+  set +e
+  lxc-attach -n "$LXC_NAME" -- bash -lc "echo '--- processes'; ps -ef | grep -E 'mosquitto|db-mqtt-worker|auth-service' | grep -v grep || true"
+  lxc-attach -n "$LXC_NAME" -- bash -lc "echo '--- ss 1883/8080'; ss -ltnp | grep -E ':1883|:8080' || true"
+  lxc-attach -n "$LXC_NAME" -- bash -lc "echo '--- /tmp/mosquitto.log'; tail -n 120 /tmp/mosquitto.log || true"
+  lxc-attach -n "$LXC_NAME" -- bash -lc "echo '--- /tmp/db-worker.log'; tail -n 120 /tmp/db-worker.log || true"
+  lxc-attach -n "$LXC_NAME" -- bash -lc "echo '--- /tmp/auth-service.log'; tail -n 120 /tmp/auth-service.log || true"
+}
+trap dump_debug ERR
+
 cleanup() { set +e; lxc-stop -n "$LXC_NAME" >/dev/null 2>&1 || true; }
 trap cleanup EXIT
 
@@ -46,8 +56,6 @@ lxc-attach -n "$LXC_NAME" -- bash -lc "cd /opt/portal-captive-small && nohup /op
 
 sleep 4
 lxc-attach -n "$LXC_NAME" -- bash -lc "kill -0 \$(cat /run/portal-mosquitto.pid) >/dev/null 2>&1"
-lxc-attach -n "$LXC_NAME" -- bash -lc "kill -0 \$(cat /run/portal-db-worker.pid) >/dev/null 2>&1"
-lxc-attach -n "$LXC_NAME" -- bash -lc "kill -0 \$(cat /run/portal-auth.pid) >/dev/null 2>&1"
 RESP_HEALTH="$(lxc-attach -n "$LXC_NAME" -- curl -sS http://127.0.0.1:8080/health)"
 RESP_DB_HEALTH="$(lxc-attach -n "$LXC_NAME" -- curl -sS http://127.0.0.1:8080/health/db-mqtt)"
 [[ "$RESP_HEALTH" == *'"status":"ok"'* ]]

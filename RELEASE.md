@@ -1,5 +1,9 @@
 # RELEASE
 
+## Unreleased
+- Se agrega documentación SpecNative de incidentes de despliegue en Raspi3B/LXC.
+- Se consolidan fallos reales observados, evidencia técnica, causa raíz y fixes verificados.
+
 ## v0.1.0
 - Frontend and backend initial release artifacts.
 

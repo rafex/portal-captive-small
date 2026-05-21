@@ -1,5 +1,9 @@
 # CHANGE
 
+## Unreleased
+- Documentación SpecNative del incidente de arranque LXC en Raspberry Pi 3B (`docs/09-rpi3b-lxc-incident-specnative.md`).
+- Registro de causa raíz y reparaciones aplicadas en scripts de instalación/smoke.
+
 ## v0.1.0
 - Initial public baseline for captive portal stack.
 

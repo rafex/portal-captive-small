@@ -73,4 +73,5 @@ sudo bash scripts/install/rpi3b-direct-install.sh v0.1.0
 - `dist/script-install.sh`
 
 ## Documentación
-Ver `docs/` para arquitectura, modelo de datos, despliegue en Raspberry Pi 3B y pipeline de releases.
+Ver `docs/` para arquitectura, modelo de datos, despliegue en Raspberry Pi 3B, pipeline de releases e incidentes operativos.
+- `docs/09-rpi3b-lxc-incident-specnative.md`: postmortem técnico en formato SpecNative (fallos y reparaciones de arranque LXC en Raspi3B).

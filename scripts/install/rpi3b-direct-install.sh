@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+IN_HEALTH_RETRY=0
+
 dump_debug() {
+  if [[ "${IN_HEALTH_RETRY:-0}" == "1" ]]; then
+    return 0
+  fi
   set +e
   echo "Fallo detectado, diagnóstico LXC:"
   lxc-attach -n "${LXC_NAME:-portal-captive}" -- bash -lc "echo '--- processes'; ps -ef | grep -E 'mosquitto|db-mqtt-worker|auth-service|http.server' | grep -v grep || true"
@@ -69,6 +74,7 @@ sleep 4
 lxc-attach -n "$LXC_NAME" -- bash -lc "kill -0 \$(cat /run/portal-mosquitto.pid) >/dev/null 2>&1"
 
 HEALTH_OK=0
+IN_HEALTH_RETRY=1
 for _ in $(seq 1 20); do
   if lxc-attach -n "$LXC_NAME" -- curl -sS http://127.0.0.1:8080/health >/dev/null 2>&1; then
     HEALTH_OK=1
@@ -76,6 +82,7 @@ for _ in $(seq 1 20); do
   fi
   sleep 1
 done
+IN_HEALTH_RETRY=0
 if [[ "$HEALTH_OK" -ne 1 ]]; then
   echo "Healthcheck falló"
   dump_debug

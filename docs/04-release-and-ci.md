@@ -12,6 +12,8 @@ Generar artefactos reproducibles frontend/backend y checksums SHA256 en GitHub A
 - backend por arquitectura:
   - `backend-<version>-x86_64.tar.gz` + `.sha256`
   - `backend-<version>-arm64.tar.gz` + `.sha256`
+- imagen LXC base (arm64):
+  - `lxc-image-<version>-arm64.tar.gz` + `.sha256`
 - `fat-jar` por arquitectura:
   - `auth-service-fat-<version>-x86_64.jar` + `.sha256`
   - `auth-service-fat-<version>-arm64.jar` + `.sha256`

@@ -62,6 +62,8 @@ sudo bash scripts/install/rpi3b-direct-install.sh v0.1.0
 - `dist/backend-<version>-x86_64.tar.gz.sha256`
 - `dist/backend-<version>-arm64.tar.gz`
 - `dist/backend-<version>-arm64.tar.gz.sha256`
+- `dist/lxc-image-<version>-arm64.tar.gz`
+- `dist/lxc-image-<version>-arm64.tar.gz.sha256`
 - `dist/auth-service-fat-<version>-x86_64.jar`
 - `dist/auth-service-fat-<version>-x86_64.jar.sha256`
 - `dist/auth-service-fat-<version>-arm64.jar`

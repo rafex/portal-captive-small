@@ -27,12 +27,24 @@ fi
 ROOT_DIR="/opt/portal-captive-small"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+DIST_DIR="${DIST_DIR:-/tmp/portal-captive-small-dist}"
+BASE_URL="https://github.com/rafex/portal-captive-small/releases/download/${VERSION}"
 LXC_NAME="${LXC_NAME:-portal-captive}"
 LXC_PATH="${LXC_PATH:-/var/lib/lxc}"
 BROKER_PORT="${BROKER_PORT:-1883}"
 ARCH="${ARCH:-arm64}"
 CT_IP="${CT_IP:-10.0.3.15}"
 CT_GW="${CT_GW:-10.0.3.1}"
+USE_RELEASE_LXC_IMAGE="${USE_RELEASE_LXC_IMAGE:-1}"
+
+verify_checksum() {
+  local file="$1"
+  local checksum_file="$2"
+  local expected actual
+  expected="$(awk '{print $1}' "$checksum_file" | head -n1)"
+  actual="$(sha256sum "$file" | awk '{print $1}')"
+  [[ -n "$expected" && "$expected" == "$actual" ]]
+}
 
 "${SCRIPT_DIR}/rpi3b-lxc-install.sh" "$VERSION"
 
@@ -40,7 +52,23 @@ if [[ -d "${LXC_PATH}/${LXC_NAME}" ]]; then
   lxc-stop -n "$LXC_NAME" >/dev/null 2>&1 || true
   lxc-destroy -n "$LXC_NAME" >/dev/null 2>&1 || true
 fi
-lxc-create -n "$LXC_NAME" -t download -- -d debian -r bookworm -a "$ARCH"
+
+PREBUILT_OK=0
+if [[ "$USE_RELEASE_LXC_IMAGE" == "1" ]]; then
+  mkdir -p "$DIST_DIR"
+  cd "$DIST_DIR"
+  if curl -fsSLO "${BASE_URL}/lxc-image-${VERSION#v}-${ARCH}.tar.gz" \
+    && curl -fsSLO "${BASE_URL}/lxc-image-${VERSION#v}-${ARCH}.tar.gz.sha256" \
+    && verify_checksum "lxc-image-${VERSION#v}-${ARCH}.tar.gz" "lxc-image-${VERSION#v}-${ARCH}.tar.gz.sha256"; then
+    mkdir -p "$LXC_PATH"
+    tar -xzf "lxc-image-${VERSION#v}-${ARCH}.tar.gz" -C "$LXC_PATH"
+    PREBUILT_OK=1
+  fi
+fi
+
+if [[ "$PREBUILT_OK" -ne 1 ]]; then
+  lxc-create -n "$LXC_NAME" -t download -- -d debian -r bookworm -a "$ARCH"
+fi
 
 if [[ -f "$REPO_ROOT/containers/lxc/portal-captive.conf" ]]; then
   cp "$REPO_ROOT/containers/lxc/portal-captive.conf" "${LXC_PATH}/${LXC_NAME}/config"

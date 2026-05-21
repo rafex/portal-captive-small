@@ -73,7 +73,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y sqlite3 mosquitto mosquitto-clients
+          sudo apt-get install -y sqlite3 mosquitto mosquitto-clients debootstrap
 
       - name: Validate
         run: make validate
@@ -109,6 +109,26 @@ jobs:
           (cd dist && sha256sum "auth-service-fat-${VERSION}-${{ matrix.arch }}.jar" > "auth-service-fat-${VERSION}-${{ matrix.arch }}.jar.sha256")
           (cd dist && sha256sum "db-mqtt-worker-${VERSION}-${{ matrix.arch }}" > "db-mqtt-worker-${VERSION}-${{ matrix.arch }}.sha256")
           (cd dist && sha256sum "backend-${VERSION}-${{ matrix.arch }}.tar.gz" > "backend-${VERSION}-${{ matrix.arch }}.tar.gz.sha256")
+
+      - name: Build LXC image artifact (arm64 only)
+        if: matrix.arch == 'arm64'
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          IMG_DIR="dist/lxc-image/portal-captive"
+          ROOTFS_DIR="${IMG_DIR}/rootfs"
+
+          mkdir -p "${ROOTFS_DIR}"
+          sudo debootstrap --arch=arm64 --variant=minbase bookworm "${ROOTFS_DIR}" http://deb.debian.org/debian
+
+          sudo mkdir -p "${ROOTFS_DIR}/opt/portal-captive-small"
+          sudo cp -a dist/package/backend "${ROOTFS_DIR}/opt/portal-captive-small/"
+          sudo mkdir -p "${ROOTFS_DIR}/opt/portal-captive-small/data"
+
+          sudo cp containers/lxc/portal-captive.conf "${IMG_DIR}/config"
+          sudo chown -R "$(id -u):$(id -g)" dist/lxc-image
+
+          tar -czf "dist/lxc-image-${VERSION}-arm64.tar.gz" -C dist/lxc-image portal-captive
+          (cd dist && sha256sum "lxc-image-${VERSION}-arm64.tar.gz" > "lxc-image-${VERSION}-arm64.tar.gz.sha256")
 
       - name: Upload backend artifacts (${{ matrix.arch }})
         uses: actions/upload-artifact@v4

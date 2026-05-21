@@ -27,6 +27,9 @@ sudo bash scripts/install/rpi3b-lxc-install.sh v0.1.0
 ```bash
 sudo bash scripts/install/rpi3b-direct-install.sh v0.1.0
 ```
+Nota:
+- El script intenta descargar `lxc-image-<version>-arm64.tar.gz` desde el release y usarlo como base del contenedor.
+- Si el artefacto no existe o falla validación SHA256, hace fallback automático a `lxc-create -t download`.
 
 ## 4) Smoke de artifacts release
 ```bash

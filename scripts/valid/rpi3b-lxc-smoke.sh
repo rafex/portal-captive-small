@@ -50,7 +50,7 @@ sleep 5
 
 lxc-attach -n "$LXC_NAME" -- bash -lc "printf 'nameserver 1.1.1.1\nnameserver 8.8.8.8\n' >/etc/resolv.conf"
 if ! lxc-attach -n "$LXC_NAME" -- bash -lc "command -v mosquitto >/dev/null 2>&1 && command -v sqlite3 >/dev/null 2>&1 && command -v curl >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1"; then
-  lxc-attach -n "$LXC_NAME" -- bash -lc "apt-get update -o Acquire::Retries=5 -o Acquire::http::Timeout=20 && apt-get install -y --no-install-recommends mosquitto mosquitto-clients sqlite3 curl python3 ca-certificates"
+  lxc-attach -n "$LXC_NAME" -- bash -lc "apt-get update -o Acquire::Retries=5 -o Acquire::http::Timeout=20 && apt-get install -y --no-install-recommends mosquitto mosquitto-clients sqlite3 curl python3 ca-certificates procps iproute2"
 fi
 
 bash "$ROOT_DIR/scripts/install/rpi3b-lxc-install.sh" "$VERSION"

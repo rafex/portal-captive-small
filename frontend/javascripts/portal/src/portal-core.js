@@ -1,6 +1,6 @@
 export function mountPortal(rootNode, options = {}) {
   const apiBaseUrl = options.apiBaseUrl || "";
-  const template = (options.template || "hotel").toLowerCase();
+  const configuredTemplate = (options.template || "hotel").toLowerCase();
 
   rootNode.innerHTML = `
     <main>
@@ -26,23 +26,6 @@ export function mountPortal(rootNode, options = {}) {
   const statusNode = rootNode.querySelector("#status");
   const loginForm = rootNode.querySelector("#login-form");
   const registerForm = rootNode.querySelector("#register-form");
-
-  const templateFields = {
-    hotel: ["firstName", "lastName", "email", "phone", "mobile", "address", "socialFacebook", "socialInstagram", "socialTiktok", "socialX", "password"],
-    restaurante: ["firstName", "lastName", "email", "phone", "mobile", "address", "socialFacebook", "socialInstagram", "socialTiktok", "socialX", "password"],
-    escuela: ["firstName", "lastName", "age", "email", "phone", "mobile", "socialFacebook", "socialInstagram", "socialTiktok", "socialX", "password"],
-    casa: ["firstName", "lastName", "email", "phone", "mobile", "socialFacebook", "socialInstagram", "socialTiktok", "socialX", "password"],
-    personalizado: ["firstName", "lastName", "email", "phone", "mobile", "address", "socialFacebook", "socialInstagram", "socialTiktok", "socialX", "password"],
-  };
-
-  const required = {
-    baseline: ["firstName", "lastName", "password"],
-    hotel: ["address", "mobile"],
-    restaurante: ["address", "phone"],
-    escuela: ["email", "age"],
-    casa: ["mobile"],
-    personalizado: [],
-  };
 
   const labels = {
     firstName: "Nombres",
@@ -85,25 +68,107 @@ export function mountPortal(rootNode, options = {}) {
     return body;
   }
 
-  const fields = templateFields[template] || templateFields.personalizado;
-  const requiredSet = new Set([...(required.baseline || []), ...(required[template] || [])]);
+  function parseTemplateSpecFromToml(tomlText, fallbackTemplate) {
+    const templateRegex = /^\s*\[templates\.([A-Za-z0-9_\-]+)\]\s*$/;
+    const lines = (tomlText || "").split(/\r?\n/);
+    const templates = {};
+    let sectionTemplate = "";
+    let inRegistration = false;
+    let registrationTemplate = fallbackTemplate;
 
-  for (const name of fields) {
-    const input = document.createElement("input");
-    input.name = name;
-    input.placeholder = labels[name] || name;
-    input.type = name === "password" ? "password" : (name === "email" ? "email" : (name === "age" ? "number" : "text"));
-    if (name === "age") {
-      input.min = "0";
+    for (let i = 0; i < lines.length; i += 1) {
+      const line = lines[i].trim();
+      if (!line || line.startsWith("#")) continue;
+
+      const sectionMatch = line.match(templateRegex);
+      if (sectionMatch) {
+        sectionTemplate = sectionMatch[1].toLowerCase();
+        inRegistration = false;
+        if (!templates[sectionTemplate]) templates[sectionTemplate] = [];
+        continue;
+      }
+      if (/^\s*\[/.test(line)) {
+        sectionTemplate = "";
+        inRegistration = line === "[registration]";
+      }
+      if (inRegistration && /^\s*template\s*=/.test(line)) {
+        const m = line.match(/=\s*"([^"]+)"/);
+        if (m && m[1]) registrationTemplate = m[1].toLowerCase();
+      }
+      if (sectionTemplate && line.startsWith("fields_enabled")) {
+        let block = line;
+        while (!block.includes("]") && i < lines.length - 1) {
+          i += 1;
+          block += lines[i];
+        }
+        const pairs = block.match(/\[\s*"([^"]+)"\s*,\s*"([^"]+)"\s*]/g) || [];
+        templates[sectionTemplate] = pairs.map((pair) => {
+          const m = pair.match(/\[\s*"([^"]+)"\s*,\s*"([^"]+)"\s*]/);
+          return { field: m[1], mode: m[2] };
+        });
+      }
     }
-    input.required = requiredSet.has(name);
-    registerForm.appendChild(input);
+    return { templates, registrationTemplate };
   }
 
-  const registerButton = document.createElement("button");
-  registerButton.type = "submit";
-  registerButton.textContent = "Registrarme";
-  registerForm.appendChild(registerButton);
+  function mapTomlFieldToApiField(name) {
+    const normalized = String(name || "").toLowerCase();
+    const map = {
+      name: "firstName",
+      lastname: "lastName",
+      nickname: "firstName",
+      room: "address",
+      social: "socialX",
+      terms: "termsAccepted",
+      email: "email",
+      password: "password",
+      phone: "phone",
+      mobile: "mobile",
+      address: "address",
+      age: "age",
+      first_name: "firstName",
+      last_name: "lastName",
+    };
+    return map[normalized] || null;
+  }
+
+  function renderRegisterForm(templateSpec) {
+    const fields = templateSpec && templateSpec.length > 0 ? templateSpec : [
+      { field: "name", mode: "required" },
+      { field: "lastname", mode: "required" },
+      { field: "email", mode: "required" },
+      { field: "password", mode: "required" },
+    ];
+
+    for (const item of fields) {
+      const apiField = mapTomlFieldToApiField(item.field);
+      if (!apiField) continue;
+      const input = document.createElement("input");
+      input.name = apiField;
+      input.placeholder = labels[apiField] || item.field;
+      input.type = apiField === "password" ? "password" : (apiField === "email" ? "email" : (apiField === "age" ? "number" : "text"));
+      if (apiField === "age") input.min = "0";
+      input.required = String(item.mode || "").toLowerCase() === "required";
+      registerForm.appendChild(input);
+    }
+
+    const registerButton = document.createElement("button");
+    registerButton.type = "submit";
+    registerButton.textContent = "Registrarme";
+    registerForm.appendChild(registerButton);
+  }
+
+  (async () => {
+    try {
+      const response = await fetch(`${apiBaseUrl}/portal/config/toml`);
+      const toml = await response.text();
+      const parsed = parseTemplateSpecFromToml(toml, configuredTemplate);
+      const selectedTemplate = configuredTemplate || parsed.registrationTemplate;
+      renderRegisterForm(parsed.templates[selectedTemplate]);
+    } catch (_) {
+      renderRegisterForm(null);
+    }
+  })();
 
   loginForm.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -125,7 +190,7 @@ export function mountPortal(rootNode, options = {}) {
     try {
       const result = await postJson("/auth/register", {
         ...data,
-        template,
+        template: configuredTemplate,
       });
       setStatus(`Registro correcto: ${result.userId}`);
     } catch (error) {

@@ -94,7 +94,7 @@ jobs:
       - name: Package backend artifacts (${{ matrix.arch }})
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          mkdir -p dist/package/backend/bin dist/package/backend/java dist/package/backend/config
+          mkdir -p dist/package/backend/bin dist/package/backend/java dist/package/backend/config dist/package/scripts/runtime
           FAT_JAR="$(ls backend/java/portal/services/auth-service/target/auth-service-*.jar | head -n1)"
           cp backend/java/portal/services/auth-service/target/auth-service dist/package/backend/bin/auth-service-${{ matrix.arch }}
           cp "${FAT_JAR}" "dist/auth-service-fat-${VERSION}-${{ matrix.arch }}.jar"
@@ -105,7 +105,8 @@ jobs:
           cp scripts/install/rpi3b-direct-install.sh dist/
           cp scripts/install/rpi3b-lxc-install.sh dist/
           cp scripts/install/rpi3b-prepare-lxc.sh dist/
-          tar -czf "dist/backend-${VERSION}-${{ matrix.arch }}.tar.gz" -C dist/package backend
+          cp scripts/runtime/start-services.sh dist/package/scripts/runtime/start-services.sh
+          tar -czf "dist/backend-${VERSION}-${{ matrix.arch }}.tar.gz" -C dist/package backend scripts
           (cd dist && sha256sum "auth-service-fat-${VERSION}-${{ matrix.arch }}.jar" > "auth-service-fat-${VERSION}-${{ matrix.arch }}.jar.sha256")
           (cd dist && sha256sum "db-mqtt-worker-${VERSION}-${{ matrix.arch }}" > "db-mqtt-worker-${VERSION}-${{ matrix.arch }}.sha256")
           (cd dist && sha256sum "backend-${VERSION}-${{ matrix.arch }}.tar.gz" > "backend-${VERSION}-${{ matrix.arch }}.tar.gz.sha256")
@@ -126,6 +127,9 @@ jobs:
 
           sudo mkdir -p "${ROOTFS_DIR}/opt/portal-captive-small"
           sudo cp -a dist/package/backend "${ROOTFS_DIR}/opt/portal-captive-small/"
+          sudo mkdir -p "${ROOTFS_DIR}/opt/portal-captive-small/scripts/runtime"
+          sudo cp scripts/runtime/start-services.sh "${ROOTFS_DIR}/opt/portal-captive-small/scripts/runtime/start-services.sh"
+          sudo chmod +x "${ROOTFS_DIR}/opt/portal-captive-small/scripts/runtime/start-services.sh"
           sudo mkdir -p "${ROOTFS_DIR}/opt/portal-captive-small/data"
 
           sudo cp containers/lxc/portal-captive.conf "${IMG_DIR}/config"

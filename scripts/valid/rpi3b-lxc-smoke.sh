@@ -16,8 +16,7 @@ need_cmd lxc-create; need_cmd lxc-start; need_cmd lxc-stop; need_cmd lxc-destroy
 
 dump_debug() {
   set +e
-  lxc-attach -n "$LXC_NAME" -- bash -lc "echo '--- processes'; ps -ef | grep -E 'mosquitto|db-mqtt-worker|auth-service|http.server' | grep -v grep || true"
-  lxc-attach -n "$LXC_NAME" -- bash -lc "echo '--- ss 80/1883/8080'; ss -ltnp | grep -E ':80|:1883|:8080' || true"
+  lxc-attach -n "$LXC_NAME" -- bash -lc "echo '--- pid files'; ls -l /run/portal-*.pid 2>/dev/null || true; for f in /run/portal-*.pid; do [[ -f \"\$f\" ]] || continue; p=\$(cat \"\$f\"); echo \"\$f => \$p\"; [[ \"\$p\" = \"0\" ]] || [[ -d \"/proc/\$p\" ]] || echo \"missing /proc/\$p\"; done"
   lxc-attach -n "$LXC_NAME" -- bash -lc "echo '--- /tmp/mosquitto.log'; tail -n 120 /tmp/mosquitto.log || true"
   lxc-attach -n "$LXC_NAME" -- bash -lc "echo '--- /tmp/db-worker.log'; tail -n 120 /tmp/db-worker.log || true"
   lxc-attach -n "$LXC_NAME" -- bash -lc "echo '--- /tmp/auth-service.log'; tail -n 120 /tmp/auth-service.log || true"
@@ -74,12 +73,12 @@ lxc-attach -n "$LXC_NAME" -- bash -lc "test -x /opt/portal-captive-small/backend
 lxc-attach -n "$LXC_NAME" -- bash -lc "test -x /opt/portal-captive-small/backend/bin/auth-service-${ARCH}"
 
 lxc-attach -n "$LXC_NAME" -- bash -lc "rm -f /run/portal-mosquitto.pid /run/portal-db-worker.pid /run/portal-auth.pid"
-lxc-attach -n "$LXC_NAME" -- bash -lc "if mosquitto_pub -h 127.0.0.1 -p ${BROKER_PORT} -t portal/health -n >/dev/null 2>&1; then echo 0 >/run/portal-mosquitto.pid; else setsid mosquitto -p ${BROKER_PORT} >/tmp/mosquitto.log 2>&1 </dev/null & echo \$! >/run/portal-mosquitto.pid; fi"
+lxc-attach -n "$LXC_NAME" -- bash -lc "if mosquitto_pub -h 127.0.0.1 -p ${BROKER_PORT} -t portal/health -n >/dev/null 2>&1; then echo 0 >/run/portal-mosquitto.pid; else nohup mosquitto -p ${BROKER_PORT} >/tmp/mosquitto.log 2>&1 </dev/null & echo \$! >/run/portal-mosquitto.pid; fi"
 lxc-attach -n "$LXC_NAME" -- bash -lc "for i in \$(seq 1 20); do if mosquitto_pub -h 127.0.0.1 -p ${BROKER_PORT} -t portal/health -n >/dev/null 2>&1; then exit 0; fi; sleep 1; done; exit 1"
-lxc-attach -n "$LXC_NAME" -- bash -lc "env MQTT_HOST=127.0.0.1 MQTT_PORT=${BROKER_PORT} SQLITE_DB_PATH=/opt/portal-captive-small/data/auth-service.db DB_USER_REQUEST_TOPIC=portal/db/user/request setsid /opt/portal-captive-small/backend/bin/db-mqtt-worker-${ARCH} >/tmp/db-worker.log 2>&1 </dev/null & echo \$! >/run/portal-db-worker.pid"
+lxc-attach -n "$LXC_NAME" -- bash -lc "nohup env MQTT_HOST=127.0.0.1 MQTT_PORT=${BROKER_PORT} SQLITE_DB_PATH=/opt/portal-captive-small/data/auth-service.db DB_USER_REQUEST_TOPIC=portal/db/user/request /opt/portal-captive-small/backend/bin/db-mqtt-worker-${ARCH} >/tmp/db-worker.log 2>&1 </dev/null & echo \$! >/run/portal-db-worker.pid"
 lxc-attach -n "$LXC_NAME" -- bash -lc "test -f /opt/portal-captive-small/backend/config/portal-config.toml"
-lxc-attach -n "$LXC_NAME" -- bash -lc "cd /opt/portal-captive-small && setsid /opt/portal-captive-small/backend/bin/auth-service-${ARCH} backend/config/portal-config.toml >/tmp/auth-service.log 2>&1 </dev/null & echo \$! >/run/portal-auth.pid"
-lxc-attach -n "$LXC_NAME" -- bash -lc "FRONT_DIR=''; for d in /opt/portal-captive-small/dist /opt/portal-captive-small/frontend/dist /opt/portal-captive-small/frontend/javascripts/portal/dist; do if [[ -d \"\$d\" ]] && [[ -f \"\$d/index.html\" ]]; then FRONT_DIR=\"\$d\"; break; fi; done; if [[ -n \"\$FRONT_DIR\" ]]; then cd \"\$FRONT_DIR\" && setsid python3 -m http.server 80 >/tmp/frontend.log 2>&1 </dev/null & fi"
+lxc-attach -n "$LXC_NAME" -- bash -lc "cd /opt/portal-captive-small && nohup /opt/portal-captive-small/backend/bin/auth-service-${ARCH} backend/config/portal-config.toml >/tmp/auth-service.log 2>&1 </dev/null & echo \$! >/run/portal-auth.pid"
+lxc-attach -n "$LXC_NAME" -- bash -lc "FRONT_DIR=''; for d in /opt/portal-captive-small/dist /opt/portal-captive-small/frontend/dist /opt/portal-captive-small/frontend/javascripts/portal/dist; do if [[ -d \"\$d\" ]] && [[ -f \"\$d/index.html\" ]]; then FRONT_DIR=\"\$d\"; break; fi; done; if [[ -n \"\$FRONT_DIR\" ]]; then cd \"\$FRONT_DIR\" && nohup python3 -m http.server 80 >/tmp/frontend.log 2>&1 </dev/null & fi"
 
 sleep 4
 lxc-attach -n "$LXC_NAME" -- bash -lc "if [[ \"\$(cat /run/portal-mosquitto.pid)\" == \"0\" ]]; then mosquitto_pub -h 127.0.0.1 -p ${BROKER_PORT} -t portal/health -n >/dev/null 2>&1; else kill -0 \$(cat /run/portal-mosquitto.pid) >/dev/null 2>&1; fi"

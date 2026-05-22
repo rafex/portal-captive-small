@@ -1,0 +1,19 @@
+[template]
+title = "Gym WiFi"
+logo = "/assets/gym/logo.png"
+background = "/assets/gym/bg.jpg"
+primary_color = "#dc2626"
+secondary_color = "#b91c1c"
+accent_color = "#fee2e2"
+text_color = "#1c1917"
+background_color = "#fff5f5"
+button_color = "#dc2626"
+button_text_color = "#ffffff"
+link_color = "#ef4444"
+font = "Raleway"
+fields_enabled = [
+  ["name", "required"],
+  ["email", "required"],
+  ["social", "optional"],
+  ["terms", "required"]
+]

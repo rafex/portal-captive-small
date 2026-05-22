@@ -1,0 +1,19 @@
+[template]
+title = "Restaurant WiFi"
+logo = "/assets/logo.png"
+background = "/assets/bg.jpg"
+primary_color = "#0095ff"
+secondary_color = "#0070cc"
+accent_color = "#e0f2ff"
+text_color = "#1e293b"
+background_color = "#fff9f5"
+button_color = "#0095ff"
+button_text_color = "#ffffff"
+link_color = "#0070cc"
+font = "Poppins"
+fields_enabled = [
+  ["name", "optional"],
+  ["email", "required"],
+  ["social", "optional"],
+  ["terms", "required"]
+]

@@ -13,6 +13,8 @@ import com.sun.net.httpserver.HttpHandler;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Map;
@@ -30,8 +32,11 @@ public final class AuthHttpHandler implements HttpHandler {
     private final IssuePasswordUseCase issuePasswordUseCase;
     private final Supplier<Boolean> dbMqttHealthSupplier;
     private final Supplier<String> portalTomlSupplier;
+    private final Supplier<String> portalIndexHtmlSupplier;
     private final Supplier<String> portalCoreJsSupplier;
+    private final Supplier<String> portalStylesCssSupplier;
     private final Set<String> supportedTemplates;
+    private final Map<String, java.util.List<FieldRule>> templateFieldRules;
     private final String registrationTemplate;
 
     public AuthHttpHandler(RegisterUserUseCase registerUserUseCase,
@@ -39,15 +44,21 @@ public final class AuthHttpHandler implements HttpHandler {
                            IssuePasswordUseCase issuePasswordUseCase,
                            Supplier<Boolean> dbMqttHealthSupplier,
                            Supplier<String> portalTomlSupplier,
+                           Supplier<String> portalIndexHtmlSupplier,
                            Supplier<String> portalCoreJsSupplier,
+                           Supplier<String> portalStylesCssSupplier,
                            String registrationTemplate) {
         this.registerUserUseCase = registerUserUseCase;
         this.loginUseCase = loginUseCase;
         this.issuePasswordUseCase = issuePasswordUseCase;
         this.dbMqttHealthSupplier = dbMqttHealthSupplier;
         this.portalTomlSupplier = portalTomlSupplier;
+        this.portalIndexHtmlSupplier = portalIndexHtmlSupplier;
         this.portalCoreJsSupplier = portalCoreJsSupplier;
-        this.supportedTemplates = parseTemplatesFromToml(portalTomlSupplier.get());
+        this.portalStylesCssSupplier = portalStylesCssSupplier;
+        String toml = portalTomlSupplier.get();
+        this.supportedTemplates = parseTemplatesFromToml(toml);
+        this.templateFieldRules = parseTemplateFieldRulesFromToml(toml);
         this.registrationTemplate = normalizeTemplate(registrationTemplate, supportedTemplates);
     }
 
@@ -66,6 +77,10 @@ public final class AuthHttpHandler implements HttpHandler {
         try {
             if ("/".equals(path) && "GET".equals(method)) {
                 writeText(exchange, 200, "text/html; charset=utf-8", renderPortalHtml());
+                return;
+            }
+            if ("/assets/styles.css".equals(path) && "GET".equals(method)) {
+                writeText(exchange, 200, "text/css; charset=utf-8", portalStylesCssSupplier.get());
                 return;
             }
             if ("/assets/portal-core.js".equals(path) && "GET".equals(method)) {
@@ -155,36 +170,9 @@ public final class AuthHttpHandler implements HttpHandler {
     }
 
     private String renderPortalHtml() {
-        return """
-                <!doctype html>
-                <html lang="es">
-                  <head>
-                    <meta charset="UTF-8" />
-                    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-                    <title>Portal Cautivo</title>
-                    <style>
-                      body { font-family: sans-serif; margin: 0; background: #f5f7fb; color: #111; }
-                      #app { max-width: 760px; margin: 0 auto; padding: 1.25rem; }
-                      section { background: #fff; border: 1px solid #e5e7eb; border-radius: .75rem; padding: 1rem; margin-bottom: 1rem; }
-                      h1,h2 { margin: 0 0 .75rem 0; }
-                      form { display: grid; gap: .5rem; }
-                      input,button { font: inherit; padding: .6rem .7rem; border-radius: .5rem; border: 1px solid #d1d5db; }
-                      button { background: #0f766e; color: #fff; border-color: #0f766e; cursor: pointer; }
-                      #status { min-height: 1.25rem; }
-                    </style>
-                  </head>
-                  <body>
-                    <div id="app"></div>
-                    <script type="module">
-                      import { mountPortal } from '/assets/portal-core.js';
-                      mountPortal(document.getElementById('app'), {
-                        apiBaseUrl: '',
-                        template: '%s'
-                      });
-                    </script>
-                  </body>
-                </html>
-                """.formatted(registrationTemplate);
+        String bootstrap = buildBootstrapJson();
+        return portalIndexHtmlSupplier.get()
+                .replace("__PORTAL_BOOTSTRAP_JSON__", bootstrap);
     }
 
     private static String normalizeTemplate(String raw, Set<String> supportedTemplates) {
@@ -210,6 +198,79 @@ public final class AuthHttpHandler implements HttpHandler {
             out.addAll(DEFAULT_TEMPLATES);
         }
         return out;
+    }
+
+    private static Map<String, java.util.List<FieldRule>> parseTemplateFieldRulesFromToml(String toml) {
+        Map<String, java.util.List<FieldRule>> out = new HashMap<>();
+        if (toml == null || toml.isBlank()) {
+            return out;
+        }
+        String[] lines = toml.split("\\R");
+        String currentTemplate = null;
+        for (int i = 0; i < lines.length; i++) {
+            String line = lines[i].trim();
+            Matcher section = TEMPLATE_SECTION_PATTERN.matcher(line);
+            if (section.matches()) {
+                currentTemplate = section.group(1).trim().toLowerCase(Locale.ROOT);
+                out.putIfAbsent(currentTemplate, new ArrayList<>());
+                continue;
+            }
+            if (line.startsWith("[") && line.endsWith("]") && !section.matches()) {
+                currentTemplate = null;
+                continue;
+            }
+            if (currentTemplate == null) {
+                continue;
+            }
+            if (line.startsWith("fields_enabled")) {
+                StringBuilder block = new StringBuilder(line);
+                while (!block.toString().contains("]") && i + 1 < lines.length) {
+                    i++;
+                    block.append(lines[i]);
+                }
+                Matcher pair = Pattern.compile("\\[\\s*\"([^\"]+)\"\\s*,\\s*\"([^\"]+)\"\\s*]").matcher(block.toString());
+                while (pair.find()) {
+                    out.get(currentTemplate).add(new FieldRule(pair.group(1), pair.group(2)));
+                }
+            }
+        }
+        return out;
+    }
+
+    private String buildBootstrapJson() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("{");
+        sb.append("\"selectedTemplate\":\"").append(escape(registrationTemplate)).append("\",");
+        sb.append("\"templates\":{");
+        boolean firstTemplate = true;
+        for (String template : supportedTemplates) {
+            if (!firstTemplate) {
+                sb.append(",");
+            }
+            firstTemplate = false;
+            sb.append("\"").append(escape(template)).append("\":[");
+            java.util.List<FieldRule> fields = templateFieldRules.getOrDefault(template, java.util.List.of());
+            boolean firstField = true;
+            for (FieldRule field : fields) {
+                if (!firstField) {
+                    sb.append(",");
+                }
+                firstField = false;
+                sb.append("{\"field\":\"").append(escape(field.field())).append("\",\"mode\":\"")
+                        .append(escape(field.mode())).append("\"}");
+            }
+            sb.append("]");
+        }
+        sb.append("}");
+        sb.append("}");
+        return sb.toString();
+    }
+
+    private static String escape(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 
     private static void addCors(HttpExchange exchange) {
@@ -239,5 +300,8 @@ public final class AuthHttpHandler implements HttpHandler {
         exchange.sendResponseHeaders(status, bytes.length);
         exchange.getResponseBody().write(bytes);
         exchange.close();
+    }
+
+    private record FieldRule(String field, String mode) {
     }
 }

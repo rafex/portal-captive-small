@@ -1,0 +1,25 @@
+[template]
+title = "University WiFi"
+logo = "/assets/university/logo.png"
+background = "/assets/university/bg.jpg"
+primary_color = "#1e40af"
+secondary_color = "#1e3a8a"
+accent_color = "#dbeafe"
+text_color = "#1e3a8a"
+background_color = "#eff6ff"
+button_color = "#1e40af"
+button_text_color = "#ffffff"
+link_color = "#2563eb"
+font = "Open Sans"
+fields_enabled = [
+  ["name", "required"],
+  ["lastname", "required"],
+  ["email", "required"],
+  ["password", "required"],
+  ["terms", "required"]
+]
+require_institutional_email = true
+allowed_email_domains = [
+  "universidad.edu",
+  "alumnos.universidad.edu"
+]

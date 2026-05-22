@@ -1,0 +1,18 @@
+[template]
+title = "Community Network"
+logo = "/assets/community/logo.png"
+background = "/assets/community/bg.jpg"
+primary_color = "#15803d"
+secondary_color = "#166534"
+accent_color = "#dcfce7"
+text_color = "#14532d"
+background_color = "#f0fdf4"
+button_color = "#15803d"
+button_text_color = "#ffffff"
+link_color = "#16a34a"
+font = "Ubuntu"
+fields_enabled = [
+  ["nickname", "required"],
+  ["email", "optional"],
+  ["terms", "required"]
+]

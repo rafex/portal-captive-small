@@ -1,0 +1,8 @@
+body { font-family: sans-serif; margin: 0; background: #f5f7fb; color: #111; }
+#app { max-width: 760px; margin: 0 auto; padding: 1.25rem; }
+section { background: #fff; border: 1px solid #e5e7eb; border-radius: .75rem; padding: 1rem; margin-bottom: 1rem; }
+h1,h2 { margin: 0 0 .75rem 0; }
+form { display: grid; gap: .5rem; }
+input,button { font: inherit; padding: .6rem .7rem; border-radius: .5rem; border: 1px solid #d1d5db; }
+button { background: #0f766e; color: #fff; border-color: #0f766e; cursor: pointer; }
+#status { min-height: 1.25rem; }

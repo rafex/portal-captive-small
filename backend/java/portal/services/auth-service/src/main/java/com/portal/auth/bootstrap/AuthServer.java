@@ -72,17 +72,12 @@ public final class AuthServer {
                 return "";
             }
         };
-        Path repoRoot = configPath.toAbsolutePath().getParent() != null && configPath.toAbsolutePath().getParent().getParent() != null
-                ? configPath.toAbsolutePath().getParent().getParent()
-                : Path.of(".").toAbsolutePath();
-        Path portalCoreJsPath = repoRoot.resolve("frontend/javascripts/portal/src/portal-core.js");
-        Supplier<String> portalCoreJs = () -> {
-            try {
-                return Files.readString(portalCoreJsPath, StandardCharsets.UTF_8);
-            } catch (IOException e) {
-                return "export function mountPortal(root){ root.innerHTML='<p>portal-core.js no disponible</p>'; }";
-            }
-        };
+        Supplier<String> portalIndexHtml = resourceSupplier("portal/index.html",
+                "<!doctype html><html><body><div id='app'></div><script>window.__PORTAL_CONFIG__=__PORTAL_BOOTSTRAP_JSON__;</script><script type='module' src='/assets/portal-core.js'></script></body></html>");
+        Supplier<String> portalCoreJs = resourceSupplier("portal/portal-core.js",
+                "export function mountPortal(root){ root.innerHTML='<p>portal-core.js no disponible</p>'; }");
+        Supplier<String> portalStylesCss = resourceSupplier("portal/styles.css",
+                "body{font-family:sans-serif} #app{max-width:760px;margin:0 auto;padding:1rem}");
 
         HttpServer httpServer = HttpServer.create(new InetSocketAddress(config.httpPort()), 0);
         httpServer.createContext("/", new AuthHttpHandler(
@@ -91,7 +86,9 @@ public final class AuthServer {
                 service,
                 dbMqttHealth,
                 portalToml,
+                portalIndexHtml,
                 portalCoreJs,
+                portalStylesCss,
                 config.registrationTemplate()
         ));
         httpServer.setExecutor(Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors()));
@@ -127,5 +124,18 @@ public final class AuthServer {
             Files.createDirectories(parent);
         }
         return new SqliteCliUserRepository(db.toString());
+    }
+
+    private static Supplier<String> resourceSupplier(String resourcePath, String fallback) {
+        return () -> {
+            try (var in = AuthServer.class.getClassLoader().getResourceAsStream(resourcePath)) {
+                if (in == null) {
+                    return fallback;
+                }
+                return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+            } catch (IOException e) {
+                return fallback;
+            }
+        };
     }
 }

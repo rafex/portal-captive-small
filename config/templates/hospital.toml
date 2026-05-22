@@ -1,0 +1,19 @@
+[template]
+title = "Hospital WiFi"
+logo = "/assets/hospital/logo.png"
+background = "/assets/hospital/bg.jpg"
+primary_color = "#0f766e"
+secondary_color = "#0d6a63"
+accent_color = "#ccfbf1"
+text_color = "#134e4a"
+background_color = "#f0fdfa"
+button_color = "#0f766e"
+button_text_color = "#ffffff"
+link_color = "#0f766e"
+font = "Roboto"
+fields_enabled = [
+  ["name", "optional"],
+  ["email", "required"],
+  ["room", "optional"],
+  ["terms", "required"]
+]

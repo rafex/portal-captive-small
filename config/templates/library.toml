@@ -1,0 +1,19 @@
+[template]
+title = "Library WiFi"
+logo = "/assets/library/logo.png"
+background = "/assets/library/bg.jpg"
+primary_color = "#1d4ed8"
+secondary_color = "#1e40af"
+accent_color = "#dbeafe"
+text_color = "#1e3a8a"
+background_color = "#eff6ff"
+button_color = "#1d4ed8"
+button_text_color = "#ffffff"
+link_color = "#2563eb"
+font = "Source Sans Pro"
+fields_enabled = [
+  ["name", "required"],
+  ["lastname", "required"],
+  ["email", "required"],
+  ["terms", "required"]
+]

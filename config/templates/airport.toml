@@ -1,0 +1,17 @@
+[template]
+title = "Airport Free WiFi"
+logo = "/assets/airport/logo.png"
+background = "/assets/airport/bg.jpg"
+primary_color = "#0f172a"
+secondary_color = "#1e293b"
+accent_color = "#e2e8f0"
+text_color = "#0f172a"
+background_color = "#f8fafc"
+button_color = "#0f172a"
+button_text_color = "#ffffff"
+link_color = "#3b82f6"
+font = "Roboto"
+fields_enabled = [
+  ["email", "required"],
+  ["terms", "required"]
+]

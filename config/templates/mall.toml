@@ -1,0 +1,19 @@
+[template]
+title = "Mall WiFi"
+logo = "/assets/mall/logo.png"
+background = "/assets/mall/bg.jpg"
+primary_color = "#db2777"
+secondary_color = "#be185d"
+accent_color = "#fce7f3"
+text_color = "#1e293b"
+background_color = "#fdf2f8"
+button_color = "#db2777"
+button_text_color = "#ffffff"
+link_color = "#be185d"
+font = "Nunito"
+fields_enabled = [
+  ["name", "optional"],
+  ["email", "required"],
+  ["social", "optional"],
+  ["terms", "required"]
+]

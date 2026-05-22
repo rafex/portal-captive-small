@@ -1,0 +1,19 @@
+[template]
+title = "Gaming Zone WiFi"
+logo = "/assets/gaming/logo.png"
+background = "/assets/gaming/bg.jpg"
+primary_color = "#9333ea"
+secondary_color = "#7e22ce"
+accent_color = "#f3e8ff"
+text_color = "#1a1a2e"
+background_color = "#0d0d1a"
+button_color = "#9333ea"
+button_text_color = "#ffffff"
+link_color = "#a855f7"
+font = "Montserrat"
+fields_enabled = [
+  ["nickname", "required"],
+  ["email", "optional"],
+  ["social", "optional"],
+  ["terms", "required"]
+]

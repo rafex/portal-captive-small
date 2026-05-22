@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Portal Cautivo</title>
+    <link rel="stylesheet" href="/assets/styles.css" />
+  </head>
+  <body>
+    <div id="app"></div>
+    <script>
+      window.__PORTAL_CONFIG__ = __PORTAL_BOOTSTRAP_JSON__;
+    </script>
+    <script type="module">
+      import { mountPortal } from '/assets/portal-core.js';
+      mountPortal(document.getElementById('app'), {
+        apiBaseUrl: ''
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,18 @@
+[template]
+title = "Coffee WiFi"
+logo = "/assets/cafe/logo.png"
+background = "/assets/cafe/bg.jpg"
+primary_color = "#6f4e37"
+secondary_color = "#5c3d2a"
+accent_color = "#fef3e8"
+text_color = "#292524"
+background_color = "#fdf8f5"
+button_color = "#6f4e37"
+button_text_color = "#ffffff"
+link_color = "#92400e"
+font = "Lato"
+fields_enabled = [
+  ["name", "optional"],
+  ["email", "required"],
+  ["terms", "required"]
+]

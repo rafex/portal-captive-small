@@ -1,0 +1,20 @@
+[template]
+title = "Campus WiFi"
+logo = "/assets/logo.png"
+background = "/assets/bg.jpg"
+primary_color = "#0095ff"
+secondary_color = "#0070cc"
+accent_color = "#e0f2ff"
+text_color = "#1e293b"
+background_color = "#f0f9ff"
+button_color = "#0095ff"
+button_text_color = "#ffffff"
+link_color = "#0070cc"
+font = "Open Sans"
+fields_enabled = [
+  ["name", "required"],
+  ["lastname", "required"],
+  ["email", "required"],
+  ["password", "required"],
+  ["terms", "required"]
+]

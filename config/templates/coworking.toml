@@ -1,0 +1,20 @@
+[template]
+title = "Cowork WiFi"
+logo = "/assets/cowork/logo.png"
+background = "/assets/cowork/bg.jpg"
+primary_color = "#5b21b6"
+secondary_color = "#4c1d95"
+accent_color = "#ede9fe"
+text_color = "#1e1b4b"
+background_color = "#f5f3ff"
+button_color = "#5b21b6"
+button_text_color = "#ffffff"
+link_color = "#7c3aed"
+font = "Montserrat"
+fields_enabled = [
+  ["name", "required"],
+  ["lastname", "required"],
+  ["email", "required"],
+  ["social", "optional"],
+  ["terms", "required"]
+]

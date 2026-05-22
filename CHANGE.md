@@ -1,5 +1,9 @@
 # CHANGE
 
+## v0.2.2
+- fix(release-lxc): include systemd-sysv so /sbin/init exists in image
+
+
 ## v0.2.1
 - fix(ci): remove unpacked lxc-image tree before upload-artifact
 

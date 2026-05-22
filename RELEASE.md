@@ -1,5 +1,11 @@
 # RELEASE
 
+## v0.2.2
+- Artifacts publicados para v0.2.2.
+- Resumen de cambios incluidos:
+- fix(release-lxc): include systemd-sysv so /sbin/init exists in image
+
+
 ## v0.2.1
 - Artifacts publicados para v0.2.1.
 - Resumen de cambios incluidos:

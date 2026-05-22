@@ -129,6 +129,7 @@ jobs:
 
           tar -czf "dist/lxc-image-${VERSION}-arm64.tar.gz" -C dist/lxc-image portal-captive
           (cd dist && sha256sum "lxc-image-${VERSION}-arm64.tar.gz" > "lxc-image-${VERSION}-arm64.tar.gz.sha256")
+          rm -rf dist/lxc-image
 
       - name: Upload backend artifacts (${{ matrix.arch }})
         uses: actions/upload-artifact@v4

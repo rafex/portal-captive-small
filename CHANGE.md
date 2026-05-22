@@ -1,5 +1,9 @@
 # CHANGE
 
+## v0.2.3
+- fix(lxc-image): preinstall runtime deps and harden dns/apt fallback in installer
+
+
 ## v0.2.2
 - fix(release-lxc): include systemd-sysv so /sbin/init exists in image
 

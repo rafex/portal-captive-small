@@ -1,5 +1,11 @@
 # RELEASE
 
+## v0.2.3
+- Artifacts publicados para v0.2.3.
+- Resumen de cambios incluidos:
+- fix(lxc-image): preinstall runtime deps and harden dns/apt fallback in installer
+
+
 ## v0.2.2
 - Artifacts publicados para v0.2.2.
 - Resumen de cambios incluidos:

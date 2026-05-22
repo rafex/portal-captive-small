@@ -58,7 +58,7 @@ bash "$ROOT_DIR/scripts/install/rpi3b-lxc-install.sh" "$VERSION"
 
 lxc-attach -n "$LXC_NAME" -- bash -lc "mkdir -p /opt/portal-captive-small /opt/portal-captive-small/data"
 rsync -a --delete "/opt/portal-captive-small/" "${ROOTFS}/opt/portal-captive-small/"
-lxc-attach -n "$LXC_NAME" -- bash -lc "cat >/etc/network/interfaces <<'EOF'
+lxc-attach -n "$LXC_NAME" -- bash -lc "mkdir -p /etc/network && cat >/etc/network/interfaces <<'EOF'
 auto lo
 iface lo inet loopback
 

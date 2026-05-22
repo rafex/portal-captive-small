@@ -1,6 +1,7 @@
 use rumqttc::{Client, Event, Incoming, MqttOptions, QoS};
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::env;
 use std::thread;
 use std::time::Duration;
@@ -82,6 +83,10 @@ fn main() {
     let mqtt_port = env::var("MQTT_PORT").ok().and_then(|v| v.parse::<u16>().ok()).unwrap_or(1883);
     let request_topic = env::var("DB_USER_REQUEST_TOPIC").unwrap_or_else(|_| "portal/db/user/request".to_string());
     let db_path = env::var("SQLITE_DB_PATH").unwrap_or_else(|_| "data/auth-service.db".to_string());
+    let users_ttl_seconds = env::var("DB_USER_TTL_SECONDS")
+        .ok()
+        .and_then(|v| v.parse::<i64>().ok())
+        .unwrap_or(3600);
 
     let conn = Connection::open(&db_path).expect("sqlite open failed");
     setup_sqlite(&conn).expect("sqlite setup failed");
@@ -100,7 +105,7 @@ fn main() {
         match event {
             Ok(Event::Incoming(Incoming::Publish(msg))) => {
                 let payload = String::from_utf8_lossy(&msg.payload);
-                let response = handle_request(&conn, &payload);
+                let response = handle_request(&conn, &payload, users_ttl_seconds);
                 let reply_topic = extract_reply_topic(&payload)
                     .unwrap_or_else(|| "portal/db/user/response/default".to_string());
                 let body = serde_json::to_string(&response).unwrap_or_else(|_| "{\"status\":\"error\"}".to_string());
@@ -127,25 +132,19 @@ fn setup_sqlite(conn: &Connection) -> rusqlite::Result<()> {
 
     conn.execute_batch(
         "CREATE TABLE IF NOT EXISTS users (
-            user_id TEXT PRIMARY KEY,
-            first_name TEXT NOT NULL,
-            last_name TEXT NOT NULL,
-            age INTEGER,
-            email TEXT UNIQUE,
-            phone TEXT UNIQUE,
-            mobile TEXT,
-            address_text TEXT,
-            social_facebook TEXT,
-            social_instagram TEXT,
-            social_tiktok TEXT,
-            social_x TEXT,
-            password_hash TEXT NOT NULL,
-            password_salt TEXT NOT NULL,
+            id TEXT PRIMARY KEY,
+            password_hash TEXT,
+            password_salt TEXT,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
          );
-         CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
-         CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone);",
+         CREATE TABLE IF NOT EXISTS user_profiles (
+            user_id TEXT PRIMARY KEY,
+            profile_json TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+         );",
     )?;
     Ok(())
 }
@@ -154,7 +153,8 @@ fn extract_reply_topic(payload: &str) -> Option<String> {
     serde_json::from_str::<Request>(payload).ok().and_then(|r| r.reply_topic)
 }
 
-fn handle_request(conn: &Connection, payload: &str) -> Response {
+fn handle_request(conn: &Connection, payload: &str, users_ttl_seconds: i64) -> Response {
+    let _ = cleanup_expired_users(conn, users_ttl_seconds);
     let req = match serde_json::from_str::<Request>(payload) {
         Ok(v) => v,
         Err(_) => return err_resp("unknown".to_string(), "invalid_json".to_string()),
@@ -180,45 +180,42 @@ fn handle_request(conn: &Connection, payload: &str) -> Response {
 }
 
 fn user_save(conn: &Connection, req: &Request) -> rusqlite::Result<()> {
+    let profile_json = json!({
+        "firstName": req.first_name.clone(),
+        "lastName": req.last_name.clone(),
+        "age": req.age,
+        "email": req.email.clone(),
+        "phone": req.phone.clone(),
+        "mobile": req.mobile.clone(),
+        "address": req.address.clone(),
+        "socialFacebook": req.social_facebook.clone(),
+        "socialInstagram": req.social_instagram.clone(),
+        "socialTiktok": req.social_tiktok.clone(),
+        "socialX": req.social_x.clone()
+    })
+    .to_string();
+
     conn.execute(
         "INSERT INTO users (
-            user_id, first_name, last_name, age, email, phone, mobile, address_text,
-            social_facebook, social_instagram, social_tiktok, social_x,
-            password_hash, password_salt, created_at, updated_at
-         ) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16)
-         ON CONFLICT(user_id) DO UPDATE SET
-            first_name=excluded.first_name,
-            last_name=excluded.last_name,
-            age=excluded.age,
-            email=excluded.email,
-            phone=excluded.phone,
-            mobile=excluded.mobile,
-            address_text=excluded.address_text,
-            social_facebook=excluded.social_facebook,
-            social_instagram=excluded.social_instagram,
-            social_tiktok=excluded.social_tiktok,
-            social_x=excluded.social_x,
+            id, password_hash, password_salt, created_at, updated_at
+         ) VALUES (?1,?2,?3,?4,?5)
+         ON CONFLICT(id) DO UPDATE SET
             password_hash=excluded.password_hash,
             password_salt=excluded.password_salt,
             updated_at=excluded.updated_at",
         params![
             req.user_id,
-            req.first_name,
-            req.last_name,
-            req.age,
-            req.email,
-            req.phone,
-            req.mobile,
-            req.address,
-            req.social_facebook,
-            req.social_instagram,
-            req.social_tiktok,
-            req.social_x,
             req.password_hash,
             req.password_salt,
             req.created_at,
             req.updated_at,
         ],
+    )?;
+
+    conn.execute(
+        "INSERT INTO user_profiles (user_id, profile_json, created_at, updated_at) VALUES (?1,?2,?3,?4)
+         ON CONFLICT(user_id) DO UPDATE SET profile_json=excluded.profile_json,updated_at=excluded.updated_at",
+        params![req.user_id, profile_json, req.created_at, req.updated_at],
     )?;
     Ok(())
 }
@@ -251,36 +248,47 @@ fn user_find(conn: &Connection, field: &str, value: Option<&str>, request_id: St
     }
 
     let sql = if field == "email" {
-        "SELECT user_id, first_name, last_name, age, email, phone, mobile, address_text, social_facebook, social_instagram, social_tiktok, social_x, password_hash, password_salt, created_at, updated_at FROM users WHERE email=?1 LIMIT 1"
+        "SELECT u.id, u.password_hash, u.password_salt, u.created_at, u.updated_at, p.profile_json
+         FROM users u
+         LEFT JOIN user_profiles p ON p.user_id=u.id
+         WHERE json_extract(p.profile_json, '$.email')=?1 LIMIT 1"
     } else {
-        "SELECT user_id, first_name, last_name, age, email, phone, mobile, address_text, social_facebook, social_instagram, social_tiktok, social_x, password_hash, password_salt, created_at, updated_at FROM users WHERE phone=?1 LIMIT 1"
+        "SELECT u.id, u.password_hash, u.password_salt, u.created_at, u.updated_at, p.profile_json
+         FROM users u
+         LEFT JOIN user_profiles p ON p.user_id=u.id
+         WHERE json_extract(p.profile_json, '$.phone')=?1 LIMIT 1"
     };
 
     let mut stmt = conn.prepare(sql)?;
     let mut rows = stmt.query(params![v])?;
 
     if let Some(row) = rows.next()? {
+        let profile_raw: Option<String> = row.get(5)?;
+        let profile: serde_json::Value = profile_raw
+            .as_deref()
+            .and_then(|s| serde_json::from_str(s).ok())
+            .unwrap_or_else(|| json!({}));
         return Ok(Response {
             request_id,
             status: "ok".to_string(),
             error: None,
             found: Some(true),
             user_id: Some(row.get::<_, String>(0)?),
-            first_name: Some(row.get::<_, String>(1)?),
-            last_name: Some(row.get::<_, String>(2)?),
-            age: row.get::<_, Option<i64>>(3)?,
-            email: row.get::<_, Option<String>>(4)?,
-            phone: row.get::<_, Option<String>>(5)?,
-            mobile: row.get::<_, Option<String>>(6)?,
-            address: row.get::<_, Option<String>>(7)?,
-            social_facebook: row.get::<_, Option<String>>(8)?,
-            social_instagram: row.get::<_, Option<String>>(9)?,
-            social_tiktok: row.get::<_, Option<String>>(10)?,
-            social_x: row.get::<_, Option<String>>(11)?,
-            password_hash: Some(row.get::<_, String>(12)?),
-            password_salt: Some(row.get::<_, String>(13)?),
-            created_at: Some(row.get::<_, String>(14)?),
-            updated_at: Some(row.get::<_, String>(15)?),
+            first_name: profile.get("firstName").and_then(|v| v.as_str()).map(|s| s.to_string()),
+            last_name: profile.get("lastName").and_then(|v| v.as_str()).map(|s| s.to_string()),
+            age: profile.get("age").and_then(|v| v.as_i64()),
+            email: profile.get("email").and_then(|v| v.as_str()).map(|s| s.to_string()),
+            phone: profile.get("phone").and_then(|v| v.as_str()).map(|s| s.to_string()),
+            mobile: profile.get("mobile").and_then(|v| v.as_str()).map(|s| s.to_string()),
+            address: profile.get("address").and_then(|v| v.as_str()).map(|s| s.to_string()),
+            social_facebook: profile.get("socialFacebook").and_then(|v| v.as_str()).map(|s| s.to_string()),
+            social_instagram: profile.get("socialInstagram").and_then(|v| v.as_str()).map(|s| s.to_string()),
+            social_tiktok: profile.get("socialTiktok").and_then(|v| v.as_str()).map(|s| s.to_string()),
+            social_x: profile.get("socialX").and_then(|v| v.as_str()).map(|s| s.to_string()),
+            password_hash: Some(row.get::<_, String>(1)?),
+            password_salt: Some(row.get::<_, String>(2)?),
+            created_at: Some(row.get::<_, String>(3)?),
+            updated_at: Some(row.get::<_, String>(4)?),
         });
     }
 
@@ -306,6 +314,17 @@ fn user_find(conn: &Connection, field: &str, value: Option<&str>, request_id: St
         created_at: None,
         updated_at: None,
     })
+}
+
+fn cleanup_expired_users(conn: &Connection, ttl_seconds: i64) -> rusqlite::Result<()> {
+    if ttl_seconds <= 0 {
+        return Ok(());
+    }
+    conn.execute(
+        "DELETE FROM users WHERE updated_at < datetime('now', '-' || ?1 || ' seconds')",
+        params![ttl_seconds],
+    )?;
+    Ok(())
 }
 
 fn ok_resp(request_id: String) -> Response {

@@ -7,46 +7,7 @@
     <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
-    <main class="portal">
-      <h1>Portal Cautivo</h1>
-      <p id="status" aria-live="polite"></p>
-
-      <section>
-        <h2>Iniciar sesión</h2>
-        <form id="login-form">
-          <input name="identifier" placeholder="Correo o teléfono" required />
-          <input name="password" type="password" placeholder="Contraseña" required />
-          <button type="submit">Entrar</button>
-        </form>
-      </section>
-
-      <section>
-        <h2>Registro</h2>
-        <form id="register-form">
-          <select name="template" id="template" required>
-            <option value="hotel">hotel</option>
-            <option value="restaurante">restaurante</option>
-            <option value="escuela">escuela</option>
-            <option value="casa">casa</option>
-            <option value="personalizado">personalizado</option>
-          </select>
-          <input name="firstName" placeholder="Nombres" required />
-          <input name="lastName" placeholder="Apellidos" required />
-          <input name="age" type="number" min="0" placeholder="Edad" />
-          <input name="email" type="email" placeholder="Correo" />
-          <input name="phone" placeholder="Teléfono" />
-          <input name="mobile" placeholder="Celular" />
-          <input name="address" id="address" list="address-options" placeholder="Dirección" />
-          <datalist id="address-options"></datalist>
-          <input name="socialFacebook" placeholder="Facebook usuario" />
-          <input name="socialInstagram" placeholder="Instagram usuario" />
-          <input name="socialTiktok" placeholder="TikTok usuario" />
-          <input name="socialX" placeholder="X usuario" />
-          <input name="password" type="password" placeholder="Contraseña" required />
-          <button type="submit">Registrarme</button>
-        </form>
-      </section>
-    </main>
+    <div id="app"></div>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

@@ -2,6 +2,7 @@ package com.portal.auth.adapter.out.sqlite;
 
 import com.portal.auth.application.port.out.UserRepository;
 import com.portal.auth.domain.User;
+import com.portal.auth.shared.SimpleJson;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -10,44 +11,68 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 public final class SqliteCliUserRepository implements UserRepository {
     private final String dbPath;
+    private final int usersTtlSeconds;
 
     public SqliteCliUserRepository(String dbPath) {
         this.dbPath = dbPath;
+        this.usersTtlSeconds = parseTtlSeconds(System.getenv("DB_USER_TTL_SECONDS"));
         initSchema();
     }
 
     @Override
     public void save(User user) {
-        String sql = "INSERT INTO users (" +
-                "user_id, first_name, last_name, age, email, phone, mobile, address_text, " +
-                "social_facebook, social_instagram, social_tiktok, social_x, " +
-                "password_hash, password_salt, created_at, updated_at" +
+        cleanupExpired();
+
+        String usersSql = "INSERT INTO users (" +
+                "id, password_hash, password_salt, created_at, updated_at" +
                 ") VALUES (" +
-                q(user.userId()) + "," + q(user.firstName()) + "," + q(user.lastName()) + "," + q(user.age()) + "," +
-                q(user.email()) + "," + q(user.phone()) + "," + q(user.mobile()) + "," + q(user.address()) + "," +
-                q(user.socialFacebook()) + "," + q(user.socialInstagram()) + "," + q(user.socialTiktok()) + "," + q(user.socialX()) + "," +
-                q(user.passwordHash()) + "," + q(user.passwordSalt()) + "," + q(user.createdAt().toString()) + "," + q(user.updatedAt().toString()) +
-                ") ON CONFLICT(user_id) DO UPDATE SET " +
-                "first_name=excluded.first_name,last_name=excluded.last_name,age=excluded.age,email=excluded.email," +
-                "phone=excluded.phone,mobile=excluded.mobile,address_text=excluded.address_text," +
-                "social_facebook=excluded.social_facebook,social_instagram=excluded.social_instagram," +
-                "social_tiktok=excluded.social_tiktok,social_x=excluded.social_x,password_hash=excluded.password_hash," +
-                "password_salt=excluded.password_salt,updated_at=excluded.updated_at";
-        execute(sql);
+                q(user.userId()) + "," + q(nullIfBlank(user.passwordHash())) + "," + q(nullIfBlank(user.passwordSalt())) + "," +
+                q(user.createdAt().toString()) + "," + q(user.updatedAt().toString()) +
+                ") ON CONFLICT(id) DO UPDATE SET " +
+                "password_hash=excluded.password_hash,password_salt=excluded.password_salt,updated_at=excluded.updated_at";
+        execute(usersSql);
+
+        String profileJson = "{" +
+                qk("firstName") + ":" + jv(user.firstName()) + "," +
+                qk("lastName") + ":" + jv(user.lastName()) + "," +
+                qk("age") + ":" + qn(user.age()) + "," +
+                qk("email") + ":" + jv(user.email()) + "," +
+                qk("phone") + ":" + jv(user.phone()) + "," +
+                qk("mobile") + ":" + jv(user.mobile()) + "," +
+                qk("address") + ":" + jv(user.address()) + "," +
+                qk("socialFacebook") + ":" + jv(user.socialFacebook()) + "," +
+                qk("socialInstagram") + ":" + jv(user.socialInstagram()) + "," +
+                qk("socialTiktok") + ":" + jv(user.socialTiktok()) + "," +
+                qk("socialX") + ":" + jv(user.socialX()) +
+                "}";
+
+        String profileSql = "INSERT INTO user_profiles (user_id, profile_json, created_at, updated_at) VALUES (" +
+                q(user.userId()) + "," + q(profileJson) + "," + q(user.createdAt().toString()) + "," + q(user.updatedAt().toString()) +
+                ") ON CONFLICT(user_id) DO UPDATE SET profile_json=excluded.profile_json,updated_at=excluded.updated_at";
+        execute(profileSql);
     }
 
     @Override
     public Optional<User> findByEmail(String email) {
-        return findOne("SELECT user_id,first_name,last_name,age,email,phone,mobile,address_text,social_facebook,social_instagram,social_tiktok,social_x,password_hash,password_salt,created_at,updated_at FROM users WHERE email=" + q(email) + " LIMIT 1");
+        cleanupExpired();
+        return findOne("SELECT u.id, u.password_hash, u.password_salt, u.created_at, u.updated_at, p.profile_json " +
+                "FROM users u " +
+                "LEFT JOIN user_profiles p ON p.user_id=u.id " +
+                "WHERE json_extract(p.profile_json, '$.email')=" + q(email) + " LIMIT 1");
     }
 
     @Override
     public Optional<User> findByPhone(String phone) {
-        return findOne("SELECT user_id,first_name,last_name,age,email,phone,mobile,address_text,social_facebook,social_instagram,social_tiktok,social_x,password_hash,password_salt,created_at,updated_at FROM users WHERE phone=" + q(phone) + " LIMIT 1");
+        cleanupExpired();
+        return findOne("SELECT u.id, u.password_hash, u.password_salt, u.created_at, u.updated_at, p.profile_json " +
+                "FROM users u " +
+                "LEFT JOIN user_profiles p ON p.user_id=u.id " +
+                "WHERE json_extract(p.profile_json, '$.phone')=" + q(phone) + " LIMIT 1");
     }
 
     private Optional<User> findOne(String sql) {
@@ -56,36 +81,55 @@ public final class SqliteCliUserRepository implements UserRepository {
             return Optional.empty();
         }
         String[] p = lines.get(0).split("\\|", -1);
-        if (p.length < 16) {
+        if (p.length < 6) {
             return Optional.empty();
         }
+
+        Map<String, String> profile = SimpleJson.parseFlatObject(nullIfEmpty(p[5]) == null ? "{}" : p[5]);
+
         return Optional.of(new User(
-                p[0], p[1], p[2], parseInt(p[3]), nullIfEmpty(p[4]), nullIfEmpty(p[5]), nullIfEmpty(p[6]),
-                nullIfEmpty(p[7]), nullIfEmpty(p[8]), nullIfEmpty(p[9]), nullIfEmpty(p[10]), nullIfEmpty(p[11]),
-                p[12], p[13], Instant.parse(p[14]), Instant.parse(p[15])
+                p[0],
+                profile.getOrDefault("firstName", ""),
+                profile.getOrDefault("lastName", ""),
+                parseInt(profile.get("age")),
+                profile.get("email"),
+                profile.get("phone"),
+                profile.get("mobile"),
+                profile.get("address"),
+                profile.get("socialFacebook"),
+                profile.get("socialInstagram"),
+                profile.get("socialTiktok"),
+                profile.get("socialX"),
+                nullIfEmpty(p[1]) == null ? "" : p[1],
+                nullIfEmpty(p[2]) == null ? "" : p[2],
+                Instant.parse(p[3]),
+                Instant.parse(p[4])
         ));
     }
 
     private void initSchema() {
         String sql = "CREATE TABLE IF NOT EXISTS users (" +
+                "id TEXT PRIMARY KEY," +
+                "password_hash TEXT," +
+                "password_salt TEXT," +
+                "created_at TEXT NOT NULL," +
+                "updated_at TEXT NOT NULL" +
+                ");" +
+                "CREATE TABLE IF NOT EXISTS user_profiles (" +
                 "user_id TEXT PRIMARY KEY," +
-                "first_name TEXT NOT NULL," +
-                "last_name TEXT NOT NULL," +
-                "age INTEGER," +
-                "email TEXT UNIQUE," +
-                "phone TEXT UNIQUE," +
-                "mobile TEXT," +
-                "address_text TEXT," +
-                "social_facebook TEXT," +
-                "social_instagram TEXT," +
-                "social_tiktok TEXT," +
-                "social_x TEXT," +
-                "password_hash TEXT NOT NULL," +
-                "password_salt TEXT NOT NULL," +
+                "profile_json TEXT NOT NULL," +
                 "created_at TEXT NOT NULL," +
                 "updated_at TEXT NOT NULL" +
                 ");";
         execute(sql);
+    }
+
+    private void cleanupExpired() {
+        if (usersTtlSeconds <= 0) {
+            return;
+        }
+        String prune = "DELETE FROM users WHERE updated_at < datetime('now', '-" + usersTtlSeconds + " seconds')";
+        execute(prune);
     }
 
     private void execute(String sql) {
@@ -130,6 +174,17 @@ public final class SqliteCliUserRepository implements UserRepository {
         }
     }
 
+    private static int parseTtlSeconds(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return 3600;
+        }
+        try {
+            return Math.max(0, Integer.parseInt(raw.trim()));
+        } catch (NumberFormatException e) {
+            return 3600;
+        }
+    }
+
     private static Integer parseInt(String s) {
         if (s == null || s.isBlank()) {
             return null;
@@ -139,6 +194,26 @@ public final class SqliteCliUserRepository implements UserRepository {
 
     private static String nullIfEmpty(String value) {
         return (value == null || value.isEmpty()) ? null : value;
+    }
+
+    private static String nullIfBlank(String value) {
+        return (value == null || value.trim().isEmpty()) ? null : value;
+    }
+
+    private static String qk(String key) {
+        return "\"" + key + "\"";
+    }
+
+    private static String jv(String value) {
+        if (value == null) {
+            return "null";
+        }
+        String v = value.replace("\\", "\\\\").replace("\"", "\\\"");
+        return "\"" + v + "\"";
+    }
+
+    private static String qn(Integer value) {
+        return value == null ? "null" : String.valueOf(value);
     }
 
     private static String q(Object value) {

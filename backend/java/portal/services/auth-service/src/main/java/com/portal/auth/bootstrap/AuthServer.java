@@ -18,6 +18,7 @@ import com.sun.net.httpserver.HttpServer;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.Executors;
@@ -64,9 +65,35 @@ public final class AuthServer {
         commandConsumer.start();
 
         Supplier<Boolean> dbMqttHealth = () -> !(repository instanceof MqttRustUserRepository r) || r.isHealthy();
+        Supplier<String> portalToml = () -> {
+            try {
+                return Files.readString(configPath, StandardCharsets.UTF_8);
+            } catch (IOException e) {
+                return "";
+            }
+        };
+        Path repoRoot = configPath.toAbsolutePath().getParent() != null && configPath.toAbsolutePath().getParent().getParent() != null
+                ? configPath.toAbsolutePath().getParent().getParent()
+                : Path.of(".").toAbsolutePath();
+        Path portalCoreJsPath = repoRoot.resolve("frontend/javascripts/portal/src/portal-core.js");
+        Supplier<String> portalCoreJs = () -> {
+            try {
+                return Files.readString(portalCoreJsPath, StandardCharsets.UTF_8);
+            } catch (IOException e) {
+                return "export function mountPortal(root){ root.innerHTML='<p>portal-core.js no disponible</p>'; }";
+            }
+        };
 
         HttpServer httpServer = HttpServer.create(new InetSocketAddress(config.httpPort()), 0);
-        httpServer.createContext("/", new AuthHttpHandler(service, service, service, dbMqttHealth));
+        httpServer.createContext("/", new AuthHttpHandler(
+                service,
+                service,
+                service,
+                dbMqttHealth,
+                portalToml,
+                portalCoreJs,
+                config.registrationTemplate()
+        ));
         httpServer.setExecutor(Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors()));
         httpServer.start();
 

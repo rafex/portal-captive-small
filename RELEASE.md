@@ -1,5 +1,17 @@
 # RELEASE
 
+## v0.2.0
+- Artifacts publicados para v0.2.0.
+- Resumen de cambios incluidos:
+- feat(release): publish arm64 lxc image artifact and consume it on rpi install
+- fix(rpi3b): enforce static container IP in lxc config and guest network
+- fix(rpi3b): prefer repo LXC config over release copy for static IP
+- fix(ufw): rebuild before.rules nat block and purge malformed entries
+- fix(ufw): accept key=value args from just recipe
+- fix(ufw): add DNAT 80->container and publish just config-ufw-lxc
+- feat(just): auto-update CHANGE/RELEASE in tag-create
+
+
 ## Unreleased
 - Se agrega documentación SpecNative de incidentes de despliegue en Raspi3B/LXC.
 - Se consolidan fallos reales observados, evidencia técnica, causa raíz y fixes verificados.

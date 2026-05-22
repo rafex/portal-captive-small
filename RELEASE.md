@@ -1,5 +1,12 @@
 # RELEASE
 
+## v0.2.4
+- Artifacts publicados para v0.2.4.
+- Resumen de cambios incluidos:
+- fix(rpi3b): remove pgrep dependency in minimal lxc image startup
+- fix(rpi3b): create /etc/network before writing static interfaces
+
+
 ## v0.2.3
 - Artifacts publicados para v0.2.3.
 - Resumen de cambios incluidos:

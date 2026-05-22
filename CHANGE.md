@@ -1,5 +1,10 @@
 # CHANGE
 
+## v0.2.4
+- fix(rpi3b): remove pgrep dependency in minimal lxc image startup
+- fix(rpi3b): create /etc/network before writing static interfaces
+
+
 ## v0.2.3
 - fix(lxc-image): preinstall runtime deps and harden dns/apt fallback in installer
 

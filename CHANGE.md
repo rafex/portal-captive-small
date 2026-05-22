@@ -1,5 +1,9 @@
 # CHANGE
 
+## v0.2.1
+- fix(ci): remove unpacked lxc-image tree before upload-artifact
+
+
 ## v0.2.0
 - feat(release): publish arm64 lxc image artifact and consume it on rpi install
 - fix(rpi3b): enforce static container IP in lxc config and guest network

@@ -1,5 +1,11 @@
 # RELEASE
 
+## v0.2.1
+- Artifacts publicados para v0.2.1.
+- Resumen de cambios incluidos:
+- fix(ci): remove unpacked lxc-image tree before upload-artifact
+
+
 ## v0.2.0
 - Artifacts publicados para v0.2.0.
 - Resumen de cambios incluidos:

@@ -131,5 +131,14 @@ fi
 
 lxc-attach -n "$LXC_NAME" -- bash -lc "if [[ -f /run/portal-frontend.pid ]]; then kill -0 \$(cat /run/portal-frontend.pid) >/dev/null 2>&1; fi"
 
+# Optionally configure UFW bridge/NAT on host after container is healthy.
+if [[ "${AUTO_CONFIG_UFW_BRIDGE:-1}" == "1" ]] && command -v ufw >/dev/null 2>&1; then
+  EXT_IF_AUTO="$(ip route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i==\"dev\") {print $(i+1); exit}}')"
+  EXT_IF_AUTO="${EXT_IF_AUTO:-eth0}"
+  if [[ -x "$REPO_ROOT/scripts/config/rpi3b-ufw-lxc-network.sh" ]]; then
+    EXT_IF="$EXT_IF_AUTO" CT_IP="$CT_IP" CT_NET="10.0.3.0/24" LXC_IF="lxcbr0" bash "$REPO_ROOT/scripts/config/rpi3b-ufw-lxc-network.sh" || true
+  fi
+fi
+
 echo
 echo "Instalación directa completada en Raspberry Pi 3B + LXC (${LXC_NAME})"

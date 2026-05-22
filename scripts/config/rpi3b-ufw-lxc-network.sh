@@ -29,9 +29,17 @@ fi
 
 echo "[ufw-lxc] EXT_IF=$EXT_IF CT_IP=$CT_IP CT_NET=$CT_NET LXC_IF=$LXC_IF"
 
+CHANGED=0
+
 # Forward policy
-sed -i 's/^DEFAULT_FORWARD_POLICY=.*/DEFAULT_FORWARD_POLICY="ACCEPT"/' /etc/default/ufw
-grep -q '^net/ipv4/ip_forward=1' /etc/ufw/sysctl.conf || echo 'net/ipv4/ip_forward=1' >> /etc/ufw/sysctl.conf
+if ! grep -q '^DEFAULT_FORWARD_POLICY="ACCEPT"$' /etc/default/ufw; then
+  sed -i 's/^DEFAULT_FORWARD_POLICY=.*/DEFAULT_FORWARD_POLICY="ACCEPT"/' /etc/default/ufw
+  CHANGED=1
+fi
+if ! grep -q '^net/ipv4/ip_forward=1$' /etc/ufw/sysctl.conf; then
+  echo 'net/ipv4/ip_forward=1' >> /etc/ufw/sysctl.conf
+  CHANGED=1
+fi
 sysctl -w net.ipv4.ip_forward=1 >/dev/null
 
 # Rebuild NAT block to avoid malformed or duplicated legacy entries.
@@ -66,18 +74,35 @@ awk -v ct_net="$CT_NET" -v ext_if="$EXT_IF" -v ct_ip="$CT_IP" '
   }
 ' /tmp/before.rules.clean > /tmp/before.rules.new
 
-mv /tmp/before.rules.new /etc/ufw/before.rules
+if ! cmp -s /tmp/before.rules.new /etc/ufw/before.rules; then
+  mv /tmp/before.rules.new /etc/ufw/before.rules
+  CHANGED=1
+else
+  rm -f /tmp/before.rules.new
+fi
 rm -f /tmp/before.rules.clean
 
 # UFW rules
-ufw allow 22/tcp
-ufw allow 80/tcp
-ufw route allow in on "$LXC_IF" out on "$EXT_IF"
-ufw route allow in on "$EXT_IF" out on "$LXC_IF" to "$CT_IP" port 80 proto tcp
+RULE_OUT="$(ufw allow 22/tcp 2>&1 || true)"
+if [[ "$RULE_OUT" != *"Skipping adding existing rule"* ]]; then CHANGED=1; fi
+RULE_OUT="$(ufw allow 80/tcp 2>&1 || true)"
+if [[ "$RULE_OUT" != *"Skipping adding existing rule"* ]]; then CHANGED=1; fi
+RULE_OUT="$(ufw route allow in on "$LXC_IF" out on "$EXT_IF" 2>&1 || true)"
+if [[ "$RULE_OUT" != *"Skipping adding existing rule"* ]]; then CHANGED=1; fi
+RULE_OUT="$(ufw route allow in on "$EXT_IF" out on "$LXC_IF" to "$CT_IP" port 80 proto tcp 2>&1 || true)"
+if [[ "$RULE_OUT" != *"Skipping adding existing rule"* ]]; then CHANGED=1; fi
 
-# Reload
-ufw --force disable
-ufw --force enable
+if [[ "$CHANGED" -eq 0 ]]; then
+  echo "[ufw-lxc] Sin cambios: configuración ya aplicada."
+  exit 0
+fi
+
+# Reload only if active; do not force-enable unexpectedly.
+if ufw status | grep -q '^Status: active'; then
+  ufw reload
+else
+  echo "[ufw-lxc] UFW está inactivo; reglas guardadas. Activa UFW cuando corresponda."
+fi
 
 echo "[ufw-lxc] OK"
 ufw status verbose

@@ -1,5 +1,14 @@
 # CHANGE
 
+## v0.2.5
+- feat(rpi3b): ship runtime start-services script inside release image and backend tar
+- fix(rpi3b): start services via single in-container bootstrap script
+- fix(rpi3b): use nohup-based detached startup in install and smoke
+- fix(rpi3b): wait for mosquitto readiness before worker startup
+- fix(rpi3b): replace ss dependency with mosquitto_pub broker probe
+- fix(rpi3b): reuse existing mosquitto listener and validate app pids
+
+
 ## v0.2.4
 - fix(rpi3b): remove pgrep dependency in minimal lxc image startup
 - fix(rpi3b): create /etc/network before writing static interfaces

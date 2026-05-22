@@ -118,7 +118,9 @@ jobs:
           ROOTFS_DIR="${IMG_DIR}/rootfs"
 
           mkdir -p "${ROOTFS_DIR}"
-          sudo debootstrap --arch=arm64 --variant=minbase bookworm "${ROOTFS_DIR}" http://deb.debian.org/debian
+          sudo debootstrap --arch=arm64 --variant=minbase --include=systemd-sysv bookworm "${ROOTFS_DIR}" http://deb.debian.org/debian
+          # Ensure init exists as LXC entrypoint.
+          sudo test -x "${ROOTFS_DIR}/sbin/init"
 
           sudo mkdir -p "${ROOTFS_DIR}/opt/portal-captive-small"
           sudo cp -a dist/package/backend "${ROOTFS_DIR}/opt/portal-captive-small/"

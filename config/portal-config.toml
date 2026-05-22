@@ -14,42 +14,13 @@ response_wait_seconds = 5
 max_retries = 2
 retry_backoff_ms = 100
 
-[registration]
-templates_enabled = ["hotel", "restaurante", "escuela", "casa", "personalizado"]
-fields_enabled = [
-  "nombres",
-  "apellidos",
-  "edad",
-  "correo_electronico",
-  "telefono",
-  "celular",
-  "direccion",
-  "facebook",
-  "instagram",
-  "tiktok",
-  "x",
-  "contrasena"
-]
-
-[meta]
-version = "1.0"
-default_lang = "es_MX"
-supported_langs = ["es_MX", "en_US", "fr_FR"]
-
-[branding]
-logo = "/assets/logo.png"
-background = "/assets/bg.jpg"
-primary_color = "#0095ff"
-
 [fields.name]
 type = "string"
-required = false
 min_length = 2
 max_length = 120
 
 [fields.lastname]
 type = "string"
-required = false
 min_length = 2
 max_length = 120
 
@@ -59,23 +30,20 @@ required = false
 
 [fields.password]
 type = "password"
-required = false
 min_length = 6
 
 [fields.room]
 type = "string"
-required = false
 min_length = 1
 max_length = 20
 
 [fields.social]
 type = "social"
-required = false
 providers = ["facebook", "instagram", "tiktok", "x"]
 
 [fields.terms]
 type = "checkbox"
-required = false
+
 
 [i18n.es_MX.fields.name]
 label = "Nombre"
@@ -169,6 +137,9 @@ login_button = "Se connecter"
 
 [templates.hotel]
 title = "Hotel WiFi"
+logo = "/assets/logo.png"
+background = "/assets/bg.jpg"
+primary_color = "#0095ff"
 fields_enabled = [
   ["name", "required"],
   ["lastname", "required"],
@@ -180,6 +151,9 @@ fields_enabled = [
 
 [templates.restaurant]
 title = "Restaurant WiFi"
+logo = "/assets/logo.png"
+background = "/assets/bg.jpg"
+primary_color = "#0095ff"
 fields_enabled = [
   ["name", "optional"],
   ["email", "required"],
@@ -189,11 +163,149 @@ fields_enabled = [
 
 [templates.school]
 title = "Campus WiFi"
+logo = "/assets/logo.png"
+background = "/assets/bg.jpg"
+primary_color = "#0095ff"
 fields_enabled = [
   ["name", "required"],
   ["lastname", "required"],
   ["email", "required"],
   ["password", "required"],
+  ["terms", "required"]
+]
+
+[templates.coworking]
+title = "Cowork WiFi"
+logo = "/assets/cowork/logo.png"
+background = "/assets/cowork/bg.jpg"
+primary_color = "#5b21b6"
+fields_enabled = [
+  ["name", "required"],
+  ["lastname", "required"],
+  ["email", "required"],
+  ["social", "optional"],
+  ["terms", "required"]
+]
+
+[templates.cafe]
+title = "Coffee WiFi"
+logo = "/assets/cafe/logo.png"
+background = "/assets/cafe/bg.jpg"
+primary_color = "#6f4e37"
+fields_enabled = [
+  ["name", "optional"],
+  ["email", "required"],
+  ["terms", "required"]
+]
+
+[templates.airport]
+title = "Airport Free WiFi"
+logo = "/assets/airport/logo.png"
+background = "/assets/airport/bg.jpg"
+primary_color = "#0f172a"
+fields_enabled = [
+  ["email", "required"],
+  ["terms", "required"]
+]
+
+[templates.mall]
+title = "Mall WiFi"
+logo = "/assets/mall/logo.png"
+background = "/assets/mall/bg.jpg"
+primary_color = "#db2777"
+fields_enabled = [
+  ["name", "optional"],
+  ["email", "required"],
+  ["social", "optional"],
+  ["terms", "required"]
+]
+
+[templates.library]
+title = "Library WiFi"
+logo = "/assets/library/logo.png"
+background = "/assets/library/bg.jpg"
+primary_color = "#1d4ed8"
+fields_enabled = [
+  ["name", "required"],
+  ["lastname", "required"],
+  ["email", "required"],
+  ["terms", "required"]
+]
+
+[templates.hospital]
+title = "Hospital WiFi"
+logo = "/assets/hospital/logo.png"
+background = "/assets/hospital/bg.jpg"
+primary_color = "#0f766e"
+fields_enabled = [
+  ["name", "optional"],
+  ["email", "required"],
+  ["room", "optional"],
+  ["terms", "required"]
+]
+
+[templates.gym]
+title = "Gym WiFi"
+logo = "/assets/gym/logo.png"
+background = "/assets/gym/bg.jpg"
+primary_color = "#dc2626"
+fields_enabled = [
+  ["name", "required"],
+  ["email", "required"],
+  ["social", "optional"],
+  ["terms", "required"]
+]
+[templates.event]
+title = "Event WiFi"
+logo = "/assets/event/logo.png"
+background = "/assets/event/bg.jpg"
+primary_color = "#7c3aed"
+fields_enabled = [
+  ["name", "required"],
+  ["lastname", "optional"],
+  ["email", "required"],
+  ["social", "optional"],
+  ["terms", "required"]
+]
+
+[templates.community_mesh]
+title = "Community Network"
+logo = "/assets/community/logo.png"
+background = "/assets/community/bg.jpg"
+primary_color = "#15803d"
+fields_enabled = [
+  ["nickname", "required"],
+  ["email", "optional"],
+  ["terms", "required"]
+]
+
+[templates.university]
+title = "University WiFi"
+logo = "/assets/university/logo.png"
+background = "/assets/university/bg.jpg"
+primary_color = "#1e40af"
+fields_enabled = [
+  ["name", "required"],
+  ["lastname", "required"],
+  ["email", "required"],
+  ["password", "required"],
+  ["terms", "required"]
+]internet_ttl_seconds = 43200
+require_institutional_email = true
+allowed_email_domains = [
+  "universidad.edu",
+  "alumnos.universidad.edu"
+]
+
+[templates.gaming]
+title = "Gaming Zone WiFi"
+logo = "/assets/gaming/logo.png"
+background = "/assets/gaming/bg.jpg"
+primary_color = "#9333ea"
+fields_enabled = [
+  ["nickname", "required"],
+  ["email", "optional"],
+  ["social", "optional"],
   ["terms", "required"]
 ]
 
@@ -226,3 +338,8 @@ ssh_host = "192.168.1.1"
 ssh_port = 22
 ssh_user = "root"
 uci_firewall_zone = "lan"
+
+[registration]
+template = "hotel"
+default_lang = "es_MX"
+supported_langs = ["es_MX", "en_US", "fr_FR"]

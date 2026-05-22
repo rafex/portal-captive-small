@@ -116,6 +116,8 @@ lxc-attach -n "$LXC_NAME" -- bash -lc "test -x /opt/portal-captive-small/backend
 lxc-attach -n "$LXC_NAME" -- bash -lc "rm -f /tmp/mosquitto.log /tmp/db-worker.log /tmp/auth-service.log /tmp/frontend.log; touch /tmp/mosquitto.log /tmp/db-worker.log /tmp/auth-service.log /tmp/frontend.log"
 lxc-attach -n "$LXC_NAME" -- bash -lc "rm -f /run/portal-mosquitto.pid /run/portal-db-worker.pid /run/portal-auth.pid /run/portal-frontend.pid"
 lxc-attach -n "$LXC_NAME" -- bash -lc "if mosquitto_pub -h 127.0.0.1 -p ${BROKER_PORT} -t portal/health -n >/dev/null 2>&1; then echo 0 >/run/portal-mosquitto.pid; else setsid mosquitto -p ${BROKER_PORT} >/tmp/mosquitto.log 2>&1 </dev/null & echo \$! >/run/portal-mosquitto.pid; fi"
+# Wait broker readiness to avoid race before worker startup.
+lxc-attach -n "$LXC_NAME" -- bash -lc "for i in \$(seq 1 20); do if mosquitto_pub -h 127.0.0.1 -p ${BROKER_PORT} -t portal/health -n >/dev/null 2>&1; then exit 0; fi; sleep 1; done; exit 1"
 lxc-attach -n "$LXC_NAME" -- bash -lc "env MQTT_HOST=127.0.0.1 MQTT_PORT=${BROKER_PORT} SQLITE_DB_PATH=/opt/portal-captive-small/data/auth-service.db DB_USER_REQUEST_TOPIC=portal/db/user/request setsid /opt/portal-captive-small/backend/bin/db-mqtt-worker-${ARCH} >/tmp/db-worker.log 2>&1 </dev/null & echo \$! >/run/portal-db-worker.pid"
 lxc-attach -n "$LXC_NAME" -- bash -lc "test -f /opt/portal-captive-small/backend/config/portal-config.toml"
 lxc-attach -n "$LXC_NAME" -- bash -lc "cd /opt/portal-captive-small && setsid /opt/portal-captive-small/backend/bin/auth-service-${ARCH} backend/config/portal-config.toml >/tmp/auth-service.log 2>&1 </dev/null & echo \$! >/run/portal-auth.pid"

@@ -121,6 +121,8 @@ jobs:
           sudo debootstrap --arch=arm64 --variant=minbase --include=systemd-sysv bookworm "${ROOTFS_DIR}" http://deb.debian.org/debian
           # Ensure init exists as LXC entrypoint.
           sudo test -x "${ROOTFS_DIR}/sbin/init"
+          # Preinstall runtime deps to avoid apt network dependency during Raspi install.
+          sudo chroot "${ROOTFS_DIR}" /bin/bash -lc "apt-get update && apt-get install -y --no-install-recommends mosquitto mosquitto-clients sqlite3 curl python3 ca-certificates && apt-get clean && rm -rf /var/lib/apt/lists/*"
 
           sudo mkdir -p "${ROOTFS_DIR}/opt/portal-captive-small"
           sudo cp -a dist/package/backend "${ROOTFS_DIR}/opt/portal-captive-small/"

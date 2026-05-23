@@ -33,15 +33,22 @@ import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public final class AuthServer {
+    private static final Path EXTERNAL_CONFIG_DIR = Path.of("/etc/portal-captive");
+    private static final Path EXTERNAL_UI_DIR = Path.of("/srv/portal-captive");
+    private static final Logger LOGGER = Logger.getLogger(AuthServer.class.getName());
+
     private AuthServer() {
     }
 
     public static void run(Path configPath) throws IOException {
-        PortalConfig config = PortalConfig.fromToml(configPath);
+        ConfigSelection configSelection = selectConfigPath(configPath);
+        Path activeConfigPath = configSelection.path();
+        PortalConfig config = PortalConfig.fromToml(activeConfigPath);
         AsyncEventPublisher publisher = new MosquittoAsyncPublisher(config.mqttHost(), config.mqttPort());
         UserRepository repository = buildRepository(config);
         OpenWrtAccessGateway openWrtGateway = new SshOpenWrtAccessGateway(
@@ -58,7 +65,7 @@ public final class AuthServer {
                 new SmtpSocketEmailSender(config.smtpHost(), config.smtpPort(), config.smtpFrom()),
                 openWrtGateway,
                 config.sessionTtlSeconds(),
-                RegistrationTemplatePolicy.fromConfig(configPath)
+                RegistrationTemplatePolicy.fromConfig(activeConfigPath)
         );
 
         MqttCommandConsumer commandConsumer = new MqttCommandConsumer(
@@ -78,14 +85,12 @@ public final class AuthServer {
         commandConsumer.start();
 
         Supplier<Boolean> dbMqttHealth = () -> !(repository instanceof MqttRustUserRepository r) || r.isHealthy();
-        PortalBootstrap bootstrap = buildPortalBootstrap(configPath, config.registrationTemplate());
-        Supplier<String> portalIndexHtml = resourceSupplier("portal/index.html",
-                "<!doctype html><html><body><div id='app'></div><script>window.__PORTAL_CONFIG__=__PORTAL_BOOTSTRAP_JSON__;</script><script type='module' src='/assets/portal-core.js'></script></body></html>");
-        Supplier<String> portalCoreJs = resourceSupplier("portal/portal-core.js",
-                "export function mountPortal(root){ root.innerHTML='<p>portal-core.js no disponible</p>'; }");
-        Supplier<String> portalStylesCss = resourceSupplier("portal/styles.css",
-                "body{font-family:sans-serif} #app{max-width:760px;margin:0 auto;padding:1rem}");
-        Function<String, byte[]> portalAssetBytes = resourceBytesSupplier("portal");
+        PortalBootstrap bootstrap = buildPortalBootstrap(activeConfigPath, config.registrationTemplate());
+        UiSelection uiSelection = selectUiSource();
+        Supplier<String> portalIndexHtml = uiSelection.indexHtmlSupplier();
+        Supplier<String> portalCoreJs = uiSelection.portalCoreJsSupplier();
+        Supplier<String> portalStylesCss = uiSelection.portalStylesCssSupplier();
+        Function<String, byte[]> portalAssetBytes = uiSelection.assetBytesSupplier();
 
         HttpServer httpServer = HttpServer.create(new InetSocketAddress(config.httpPort()), 0);
         httpServer.createContext("/", new AuthHttpHandler(
@@ -109,8 +114,16 @@ public final class AuthServer {
             }
         }, "auth-shutdown-hook"));
 
-        System.out.println("auth-service listening on :" + config.httpPort());
-        System.out.println("auth-service repository=" + config.userRepositoryType());
+        LOGGER.info("auth-service listening on :" + config.httpPort());
+        LOGGER.info("auth-service repository=" + config.userRepositoryType());
+        LOGGER.info("auth-service config_source=" + configSelection.source() + " path=" + activeConfigPath);
+        if (configSelection.reason() != null) {
+            LOGGER.warning("auth-service config_fallback_reason=" + configSelection.reason());
+        }
+        LOGGER.info("auth-service ui_source=" + uiSelection.source() + " path=" + uiSelection.path());
+        if (uiSelection.reason() != null) {
+            LOGGER.warning("auth-service ui_fallback_reason=" + uiSelection.reason());
+        }
     }
 
     private static UserRepository buildRepository(PortalConfig config) throws IOException {
@@ -148,6 +161,19 @@ public final class AuthServer {
         };
     }
 
+    private static Supplier<String> fileSupplier(Path path, String fallback) {
+        return () -> {
+            try {
+                if (!Files.isRegularFile(path)) {
+                    return fallback;
+                }
+                return Files.readString(path, StandardCharsets.UTF_8);
+            } catch (IOException e) {
+                return fallback;
+            }
+        };
+    }
+
     private static Function<String, byte[]> resourceBytesSupplier(String baseResourceDir) {
         return (path) -> {
             String normalized = path == null ? "" : path.trim();
@@ -165,6 +191,83 @@ public final class AuthServer {
                 return null;
             }
         };
+    }
+
+    private static Function<String, byte[]> fileBytesSupplier(Path uiRoot) {
+        return (path) -> {
+            String normalized = path == null ? "" : path.trim();
+            if (!normalized.startsWith("/assets/")) {
+                return null;
+            }
+            String rel = normalized.substring("/assets/".length());
+            Path file = uiRoot.resolve("assets").resolve(rel).normalize();
+            Path assetsRoot = uiRoot.resolve("assets").normalize();
+            if (!file.startsWith(assetsRoot)) {
+                return null;
+            }
+            try {
+                if (!Files.isRegularFile(file)) {
+                    return null;
+                }
+                return Files.readAllBytes(file);
+            } catch (IOException e) {
+                return null;
+            }
+        };
+    }
+
+    private static ConfigSelection selectConfigPath(Path bundledConfigPath) {
+        Path embedded = bundledConfigPath.toAbsolutePath().normalize();
+        Path external = EXTERNAL_CONFIG_DIR.resolve("portal-config.toml");
+        String reason = null;
+        if (Files.isRegularFile(external)) {
+            try {
+                validateConfigSource(external);
+                return new ConfigSelection(external, "external", null);
+            } catch (RuntimeException e) {
+                reason = e.getMessage();
+            }
+        } else {
+            reason = "external_config_missing:/etc/portal-captive/portal-config.toml";
+        }
+        validateConfigSource(embedded);
+        return new ConfigSelection(embedded, "embedded", reason);
+    }
+
+    private static void validateConfigSource(Path portalConfigPath) {
+        PortalConfig config = PortalConfig.fromToml(portalConfigPath);
+        RegistrationTemplatePolicy.fromConfig(portalConfigPath);
+        buildPortalBootstrap(portalConfigPath, config.registrationTemplate());
+    }
+
+    private static UiSelection selectUiSource() {
+        Path root = EXTERNAL_UI_DIR.toAbsolutePath().normalize();
+        Path index = root.resolve("index.html");
+        Path css = root.resolve("styles.css");
+        Path js = root.resolve("portal-core.js");
+        if (Files.isRegularFile(index) && Files.isRegularFile(css) && Files.isRegularFile(js)) {
+            return new UiSelection(
+                    "external",
+                    root,
+                    null,
+                    fileSupplier(index, "<!doctype html><html><body><div id='app'></div></body></html>"),
+                    fileSupplier(js, "export function mountPortal(root){ root.innerHTML='<p>portal-core.js no disponible</p>'; }"),
+                    fileSupplier(css, "body{font-family:sans-serif} #app{max-width:760px;margin:0 auto;padding:1rem}"),
+                    fileBytesSupplier(root)
+            );
+        }
+        return new UiSelection(
+                "embedded",
+                Path.of("classpath:portal"),
+                "external_ui_incomplete:/srv/portal-captive/(index.html,styles.css,portal-core.js)",
+                resourceSupplier("portal/index.html",
+                        "<!doctype html><html><body><div id='app'></div><script>window.__PORTAL_CONFIG__=__PORTAL_BOOTSTRAP_JSON__;</script><script type='module' src='/assets/portal-core.js'></script></body></html>"),
+                resourceSupplier("portal/portal-core.js",
+                        "export function mountPortal(root){ root.innerHTML='<p>portal-core.js no disponible</p>'; }"),
+                resourceSupplier("portal/styles.css",
+                        "body{font-family:sans-serif} #app{max-width:760px;margin:0 auto;padding:1rem}"),
+                resourceBytesSupplier("portal")
+        );
     }
 
     private static PortalBootstrap buildPortalBootstrap(Path portalConfigPath, String fallbackTemplate) {
@@ -214,6 +317,13 @@ public final class AuthServer {
     }
 
     private static Path resolveProjectRoot(Path portalConfigPath) {
+        if (portalConfigPath.getFileName() != null &&
+                "portal-config.toml".equals(portalConfigPath.getFileName().toString())) {
+            Path parent = portalConfigPath.getParent();
+            if (parent != null) {
+                return parent;
+            }
+        }
         Path p = portalConfigPath.getParent();
         if (p == null) {
             return Path.of(".").toAbsolutePath();
@@ -403,5 +513,19 @@ public final class AuthServer {
     }
 
     private record PortalBootstrap(String json, Set<String> templates, String selectedTemplate) {
+    }
+
+    private record ConfigSelection(Path path, String source, String reason) {
+    }
+
+    private record UiSelection(
+            String source,
+            Path path,
+            String reason,
+            Supplier<String> indexHtmlSupplier,
+            Supplier<String> portalCoreJsSupplier,
+            Supplier<String> portalStylesCssSupplier,
+            Function<String, byte[]> assetBytesSupplier
+    ) {
     }
 }

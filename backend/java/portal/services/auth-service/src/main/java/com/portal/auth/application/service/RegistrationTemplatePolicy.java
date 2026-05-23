@@ -329,6 +329,13 @@ public final class RegistrationTemplatePolicy {
     }
 
     private static Path resolveProjectRoot(Path portalConfigPath) {
+        if (portalConfigPath.getFileName() != null &&
+                "portal-config.toml".equals(portalConfigPath.getFileName().toString())) {
+            Path parent = portalConfigPath.getParent();
+            if (parent != null) {
+                return parent;
+            }
+        }
         Path p = portalConfigPath.getParent();
         if (p == null) return Path.of(".").toAbsolutePath();
         if ("config".equals(p.getFileName() != null ? p.getFileName().toString() : "")) {

@@ -182,35 +182,48 @@ async function ensureConsent(root) {
   const policyModal = root.querySelector('#policy-modal');
   const saved = localStorage.getItem(COOKIE_CONSENT_KEY);
 
-  const askCookies = () => new Promise((resolve) => {
-    cookieModal.hidden = false;
-    root.querySelector('#cookie-accept').onclick = () => {
-      localStorage.setItem(COOKIE_CONSENT_KEY, 'accepted');
-      cookieModal.hidden = true;
-      resolve(true);
+  const waitChoice = (modal, acceptId, rejectId, onAccept, onReject) => new Promise((resolve) => {
+    const onClick = (ev) => {
+      const t = ev.target;
+      if (!(t instanceof HTMLElement)) return;
+      if (t.id === acceptId) {
+        cleanup();
+        onAccept?.();
+        resolve(true);
+        return;
+      }
+      if (t.id === rejectId) {
+        cleanup();
+        onReject?.();
+        resolve(false);
+      }
     };
-    root.querySelector('#cookie-reject').onclick = () => {
-      localStorage.setItem(COOKIE_CONSENT_KEY, 'rejected');
-      cookieModal.hidden = true;
-      resolve(false);
+    const cleanup = () => {
+      modal.removeEventListener('click', onClick);
+      modal.hidden = true;
     };
+    modal.hidden = false;
+    modal.addEventListener('click', onClick);
   });
 
-  const askPolicy = () => new Promise((resolve) => {
-    policyModal.hidden = false;
-    root.querySelector('#policy-accept').onclick = () => {
-      policyModal.hidden = true;
-      resolve(true);
-    };
-    root.querySelector('#policy-reject').onclick = () => {
-      policyModal.hidden = true;
-      resolve(false);
-    };
-  });
+  const askCookies = () => waitChoice(
+    cookieModal,
+    'cookie-accept',
+    'cookie-reject',
+    () => localStorage.setItem(COOKIE_CONSENT_KEY, 'accepted'),
+    () => localStorage.setItem(COOKIE_CONSENT_KEY, 'rejected')
+  );
 
+  const askPolicy = () => waitChoice(
+    policyModal,
+    'policy-accept',
+    'policy-reject'
+  );
+
+  const policyAccepted = await askPolicy();
+  if (!policyAccepted) return false;
   const cookiesAccepted = saved === 'accepted' ? true : (saved === 'rejected' ? false : await askCookies());
-  if (!cookiesAccepted) return false;
-  return askPolicy();
+  return cookiesAccepted;
 }
 
 function renderShell(root, template) {

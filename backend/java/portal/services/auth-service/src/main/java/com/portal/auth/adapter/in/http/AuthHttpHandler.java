@@ -89,6 +89,10 @@ public final class AuthHttpHandler implements HttpHandler {
                 writeText(exchange, 200, "text/javascript; charset=utf-8", portalCoreJsSupplier.get());
                 return;
             }
+            if ("/favicon.ico".equals(path) && "GET".equals(method)) {
+                serveStaticAsset(exchange, "/assets/favicon.ico");
+                return;
+            }
             if (path.startsWith("/assets/") && "GET".equals(method)) {
                 serveStaticAsset(exchange, path);
                 return;
@@ -218,6 +222,7 @@ public final class AuthHttpHandler implements HttpHandler {
     }
 
     private static String guessContentType(String path) {
+        if (path.endsWith(".ico")) return "image/x-icon";
         if (path.endsWith(".png")) return "image/png";
         if (path.endsWith(".jpg") || path.endsWith(".jpeg")) return "image/jpeg";
         if (path.endsWith(".svg")) return "image/svg+xml";

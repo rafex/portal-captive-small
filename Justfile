@@ -85,6 +85,11 @@ docker-up:
 docker-up-build:
     bash scripts/docker/stack.sh up --build
 
+# Fuerza rebuild sin caché y recrea contenedores
+docker-up-rebuild:
+    podman compose -f containers/docker/compose.yaml build --no-cache
+    podman compose -f containers/docker/compose.yaml up -d --force-recreate
+
 # Alias corto: levanta stack reconstruyendo imágenes en detached
 docker-up-build-detached:
     bash scripts/docker/stack.sh up --build

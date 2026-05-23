@@ -12,7 +12,10 @@ import com.portal.auth.application.service.AuthService;
 import com.portal.auth.application.service.RegistrationTemplatePolicy;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 public final class AuthServiceSelfTest {
     private AuthServiceSelfTest() {
@@ -52,9 +55,9 @@ public final class AuthServiceSelfTest {
                     "hotel-selftest@example.com", "+525511110002", "+525511110002", "",
                     "", "", "", "", "Secret123"
             ));
-            throw new IllegalStateException("expected address_required_hotel");
+            throw new IllegalStateException("expected address_required");
         } catch (IllegalArgumentException e) {
-            assert "address_required_hotel".equals(e.getMessage()) : "unexpected error " + e.getMessage();
+            assert "address_required".equals(e.getMessage()) : "unexpected error " + e.getMessage();
         }
     }
 
@@ -110,8 +113,22 @@ public final class AuthServiceSelfTest {
                 emailSender,
                 new NoopOpenWrtGateway(),
                 3600,
-                new RegistrationTemplatePolicy()
+                testPolicy()
         );
+    }
+
+    private static RegistrationTemplatePolicy testPolicy() {
+        Map<String, Set<String>> required = new HashMap<>();
+        required.put("casa", Set.of("name", "lastname", "password", "mobile"));
+        required.put("hotel", Set.of("name", "lastname", "email", "address"));
+
+        Map<String, RegistrationTemplatePolicy.FieldSpec> specs = new HashMap<>();
+        specs.put("name", new RegistrationTemplatePolicy.FieldSpec("string", 1, 120));
+        specs.put("lastname", new RegistrationTemplatePolicy.FieldSpec("string", 1, 120));
+        specs.put("email", new RegistrationTemplatePolicy.FieldSpec("email", null, null));
+        specs.put("password", new RegistrationTemplatePolicy.FieldSpec("password", 6, null));
+
+        return new RegistrationTemplatePolicy(required, specs);
     }
 
     private static final class TestPublisher implements AsyncEventPublisher {

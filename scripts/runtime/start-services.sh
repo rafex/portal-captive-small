@@ -7,6 +7,7 @@ ROOT_DIR="${ROOT_DIR:-/opt/portal-captive-small}"
 DATA_DB="${DATA_DB:-${ROOT_DIR}/data/auth-service.db}"
 REQ_TOPIC="${REQ_TOPIC:-portal/db/user/request}"
 USER_TTL_SECONDS="${USER_TTL_SECONDS:-3600}"
+AUTH_JAVA_NATIVE_ACCESS_OPTS="${AUTH_JAVA_NATIVE_ACCESS_OPTS:---enable-native-access=ALL-UNNAMED}"
 
 if [[ -f "${ROOT_DIR}/backend/config/portal-config.toml" ]]; then
   CFG_TTL="$(awk '
@@ -50,7 +51,7 @@ nohup env MQTT_HOST=127.0.0.1 MQTT_PORT="${BROKER_PORT}" SQLITE_DB_PATH="${DATA_
 echo $! >/run/portal-db-worker.pid
 
 cd "${ROOT_DIR}"
-nohup "${ROOT_DIR}/backend/bin/auth-service-${ARCH}" backend/config/portal-config.toml >/tmp/auth-service.log 2>&1 </dev/null &
+nohup env JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:-} ${AUTH_JAVA_NATIVE_ACCESS_OPTS}" "${ROOT_DIR}/backend/bin/auth-service-${ARCH}" backend/config/portal-config.toml >/tmp/auth-service.log 2>&1 </dev/null &
 echo $! >/run/portal-auth.pid
 
 sleep 2

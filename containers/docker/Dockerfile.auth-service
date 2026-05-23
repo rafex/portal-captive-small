@@ -23,6 +23,7 @@ RUN ./mvnw -f pom.xml dependency:go-offline -q || true
 COPY backend/java/portal/ .
 
 # Fat JAR (usado en la etapa de runtime JVM)
+ENV MAVEN_OPTS="--enable-native-access=ALL-UNNAMED"
 RUN ./mvnw -q -DskipTests package
 
 # ─────────────────────────────────────────────
@@ -41,4 +42,4 @@ COPY sql/   sql/
 
 EXPOSE 8080
 
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTRYPOINT ["java", "--enable-native-access=ALL-UNNAMED", "-jar", "app.jar"]

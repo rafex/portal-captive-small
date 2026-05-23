@@ -109,6 +109,10 @@ public final class MqttCommandConsumer {
         try {
             RegisterUserCommand command = new RegisterUserCommand(
                     json.get("template"),
+                    json.get("deviceIp"),
+                    json.get("deviceUuid"),
+                    json.get("deviceFingerprint"),
+                    json.get("userAgent"),
                     json.get("firstName"),
                     json.get("lastName"),
                     parseInt(json.get("age")),

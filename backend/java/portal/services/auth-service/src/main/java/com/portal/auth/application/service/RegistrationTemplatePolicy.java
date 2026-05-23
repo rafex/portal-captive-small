@@ -48,7 +48,7 @@ public final class RegistrationTemplatePolicy {
         if (isBlank(templatesCfgFile)) {
             templatesCfgFile = portalKv.getOrDefault("templates_config.file", "config/templates-config.toml");
         }
-        Path templatesCfgPath = repoRoot.resolve(templatesCfgFile).normalize();
+        Path templatesCfgPath = resolveFromRoot(repoRoot, templatesCfgFile);
         String templatesCfgRaw = readFile(templatesCfgPath);
         Map<String, String> templatesCfgKv = SimpleToml.parseFlat(templatesCfgPath);
 
@@ -56,7 +56,7 @@ public final class RegistrationTemplatePolicy {
         if (isBlank(templatesDir)) {
             templatesDir = templatesCfgKv.getOrDefault("templates.directory", "config/templates");
         }
-        Path templatesDirPath = repoRoot.resolve(templatesDir).normalize();
+        Path templatesDirPath = resolveFromRoot(repoRoot, templatesDir);
 
         List<String> templates = parseArrayInSection(templatesCfgRaw, "templates", "available");
         if (templates.isEmpty()) {
@@ -347,6 +347,31 @@ public final class RegistrationTemplatePolicy {
         }
         Path parent = p.getParent();
         return parent != null ? parent : Path.of(".").toAbsolutePath();
+    }
+
+    private static Path resolveFromRoot(Path root, String ref) {
+        String pathRef = ref == null ? "" : ref.trim();
+        if (pathRef.isEmpty()) {
+            return root;
+        }
+        Path candidate1 = root.resolve(pathRef).normalize();
+        if (Files.exists(candidate1)) {
+            return candidate1;
+        }
+        if (pathRef.startsWith("config/")) {
+            Path candidate2 = root.resolve(pathRef.substring("config/".length())).normalize();
+            if (Files.exists(candidate2)) {
+                return candidate2;
+            }
+        }
+        Path parent = root.getParent();
+        if (parent != null) {
+            Path candidate3 = parent.resolve(pathRef).normalize();
+            if (Files.exists(candidate3)) {
+                return candidate3;
+            }
+        }
+        return candidate1;
     }
 
     private static String readFile(Path path) {

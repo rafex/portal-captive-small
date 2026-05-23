@@ -279,14 +279,14 @@ public final class AuthServer {
             templatesCfgFile = portalCfg.getOrDefault("templates_config.file", "config/templates-config.toml");
         }
         String selectedTemplate = portalCfg.getOrDefault("registration.template", fallbackTemplate);
-        Path templatesCfgPath = repoRoot.resolve(templatesCfgFile).normalize();
+        Path templatesCfgPath = resolveFromRoot(repoRoot, templatesCfgFile);
         String templatesCfgRaw = readFile(templatesCfgPath);
         Map<String, String> templatesCfg = SimpleToml.parseFlat(templatesCfgPath);
         String templatesDir = parseKeyInSection(templatesCfgRaw, "templates", "directory");
         if (templatesDir == null || templatesDir.isBlank()) {
             templatesDir = templatesCfg.getOrDefault("templates.directory", "config/templates");
         }
-        Path templatesDirPath = repoRoot.resolve(templatesDir).normalize();
+        Path templatesDirPath = resolveFromRoot(repoRoot, templatesDir);
 
         List<String> available = parseArrayInSection(templatesCfgRaw, "templates", "available");
         if (available.isEmpty()) {
@@ -339,6 +339,31 @@ public final class AuthServer {
         }
         Path parent = p.getParent();
         return parent != null ? parent : Path.of(".").toAbsolutePath();
+    }
+
+    private static Path resolveFromRoot(Path root, String ref) {
+        String pathRef = ref == null ? "" : ref.trim();
+        if (pathRef.isEmpty()) {
+            return root;
+        }
+        Path candidate1 = root.resolve(pathRef).normalize();
+        if (Files.exists(candidate1)) {
+            return candidate1;
+        }
+        if (pathRef.startsWith("config/")) {
+            Path candidate2 = root.resolve(pathRef.substring("config/".length())).normalize();
+            if (Files.exists(candidate2)) {
+                return candidate2;
+            }
+        }
+        Path parent = root.getParent();
+        if (parent != null) {
+            Path candidate3 = parent.resolve(pathRef).normalize();
+            if (Files.exists(candidate3)) {
+                return candidate3;
+            }
+        }
+        return candidate1;
     }
 
     private static TemplateData readTemplateData(Path path, String fallbackName) {

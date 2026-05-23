@@ -97,6 +97,9 @@ jobs:
           sudo cp scripts/runtime/start-services.sh "${ROOTFS_DIR}/opt/portal-captive-small/scripts/runtime/start-services.sh"
           sudo chmod +x "${ROOTFS_DIR}/opt/portal-captive-small/scripts/runtime/start-services.sh"
           sudo mkdir -p "${ROOTFS_DIR}/opt/portal-captive-small/data"
+          sudo mkdir -p "${ROOTFS_DIR}/etc/profile.d"
+          printf '%s\n' 'export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:-} --enable-native-access=ALL-UNNAMED"' | sudo tee "${ROOTFS_DIR}/etc/profile.d/portal-captive-java.sh" >/dev/null
+          sudo chmod 0644 "${ROOTFS_DIR}/etc/profile.d/portal-captive-java.sh"
 
           sudo cp containers/lxc/portal-captive.conf "${IMG_DIR}/config"
           sudo chown -R "$(id -u):$(id -g)" dist/lxc-image

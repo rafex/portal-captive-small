@@ -1,10 +1,16 @@
 body { font-family: sans-serif; margin: 0; background: #f5f7fb; color: #111; }
-#app { max-width: 760px; margin: 0 auto; padding: 1.25rem; }
+#app { max-width: 760px; margin: 0 auto; padding: 1.25rem; border-radius: .75rem; }
 section { background: #fff; border: 1px solid #e5e7eb; border-radius: .75rem; padding: 1rem; margin-bottom: 1rem; }
-h1,h2 { margin: 0 0 .75rem 0; }
+h1,h2,h3 { margin: 0 0 .75rem 0; }
 form { display: grid; gap: .5rem; }
+label { display: grid; gap: .35rem; font-size: .95rem; }
 input,button { font: inherit; padding: .6rem .7rem; border-radius: .5rem; border: 1px solid #d1d5db; }
 button { background: var(--portal-primary, #0f766e); color: #fff; border-color: var(--portal-primary, #0f766e); cursor: pointer; }
-#status { min-height: 1.25rem; }
+button.secondary { background: #fff; border-color: #d1d5db; }
+#status { min-height: 1.25rem; margin: .5rem 0 1rem; }
 .portal-hero { display: flex; align-items: center; gap: .75rem; margin-bottom: .75rem; }
 .portal-logo { width: 48px; height: 48px; object-fit: contain; border-radius: .5rem; background: #fff; padding: .2rem; border: 1px solid #e5e7eb; }
+.portal-modal-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, .55); display: grid; place-items: center; z-index: 9999; }
+.portal-modal { background: #fff; width: min(780px, calc(100vw - 2rem)); max-height: 80vh; overflow: auto; padding: 1rem; border-radius: .75rem; border: 1px solid #d1d5db; }
+.portal-policy { white-space: pre-wrap; font-size: .85rem; line-height: 1.35; background: #f8fafc; padding: .75rem; border-radius: .5rem; border: 1px solid #e2e8f0; }
+.portal-actions { display: flex; gap: .5rem; justify-content: flex-end; margin-top: .75rem; }

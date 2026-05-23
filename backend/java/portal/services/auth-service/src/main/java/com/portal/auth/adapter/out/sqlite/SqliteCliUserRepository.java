@@ -38,6 +38,11 @@ public final class SqliteCliUserRepository implements UserRepository {
         execute(usersSql);
 
         String profileJson = "{" +
+                qk("template") + ":" + jv(user.template()) + "," +
+                qk("deviceIp") + ":" + jv(user.deviceIp()) + "," +
+                qk("deviceUuid") + ":" + jv(user.deviceUuid()) + "," +
+                qk("deviceFingerprint") + ":" + jv(user.deviceFingerprint()) + "," +
+                qk("userAgent") + ":" + jv(user.userAgent()) + "," +
                 qk("firstName") + ":" + jv(user.firstName()) + "," +
                 qk("lastName") + ":" + jv(user.lastName()) + "," +
                 qk("age") + ":" + qn(user.age()) + "," +
@@ -75,6 +80,15 @@ public final class SqliteCliUserRepository implements UserRepository {
                 "WHERE json_extract(p.profile_json, '$.phone')=" + q(phone) + " LIMIT 1");
     }
 
+    @Override
+    public Optional<User> findByDeviceIp(String deviceIp) {
+        cleanupExpired();
+        return findOne("SELECT u.id, u.password_hash, u.password_salt, u.created_at, u.updated_at, p.profile_json " +
+                "FROM users u " +
+                "LEFT JOIN user_profiles p ON p.user_id=u.id " +
+                "WHERE json_extract(p.profile_json, '$.deviceIp')=" + q(deviceIp) + " LIMIT 1");
+    }
+
     private Optional<User> findOne(String sql) {
         List<String> lines = query(sql);
         if (lines.isEmpty() || lines.get(0).isBlank()) {
@@ -89,6 +103,11 @@ public final class SqliteCliUserRepository implements UserRepository {
 
         return Optional.of(new User(
                 p[0],
+                profile.getOrDefault("template", "hotel"),
+                profile.get("deviceIp"),
+                profile.get("deviceUuid"),
+                profile.get("deviceFingerprint"),
+                profile.get("userAgent"),
                 profile.getOrDefault("firstName", ""),
                 profile.getOrDefault("lastName", ""),
                 parseInt(profile.get("age")),

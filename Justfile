@@ -85,8 +85,16 @@ docker-up:
 docker-up-build:
     bash scripts/docker/stack.sh up --build
 
+# Alias corto: levanta stack reconstruyendo imágenes en detached
+docker-up-build-detached:
+    bash scripts/docker/stack.sh up --build
+
 # Para y elimina los contenedores
 docker-down:
+    bash scripts/docker/stack.sh down
+
+# Alias corto: baja todo lo levantado por docker/podman compose
+down:
     bash scripts/docker/stack.sh down
 
 # Reinicia todos los servicios

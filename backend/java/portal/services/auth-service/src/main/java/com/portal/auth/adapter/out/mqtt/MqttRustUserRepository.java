@@ -39,6 +39,11 @@ public final class MqttRustUserRepository implements UserRepository, AutoCloseab
                 q("op") + ":" + qv("user_save") + "," +
                 q("replyTopic") + ":" + qv(replyTopic(requestId)) + "," +
                 q("userId") + ":" + qv(user.userId()) + "," +
+                q("template") + ":" + qv(user.template()) + "," +
+                q("deviceIp") + ":" + qv(user.deviceIp()) + "," +
+                q("deviceUuid") + ":" + qv(user.deviceUuid()) + "," +
+                q("deviceFingerprint") + ":" + qv(user.deviceFingerprint()) + "," +
+                q("userAgent") + ":" + qv(user.userAgent()) + "," +
                 q("firstName") + ":" + qv(user.firstName()) + "," +
                 q("lastName") + ":" + qv(user.lastName()) + "," +
                 q("age") + ":" + qn(user.age()) + "," +
@@ -73,6 +78,11 @@ public final class MqttRustUserRepository implements UserRepository, AutoCloseab
         return findBy("user_find_phone", "phone", phone);
     }
 
+    @Override
+    public Optional<User> findByDeviceIp(String deviceIp) {
+        return findBy("user_find_device_ip", "deviceIp", deviceIp);
+    }
+
     private Optional<User> findBy(String op, String field, String value) {
         String requestId = UUID.randomUUID().toString();
         String payload = "{" +
@@ -92,6 +102,11 @@ public final class MqttRustUserRepository implements UserRepository, AutoCloseab
         }
         return Optional.of(new User(
                 json.get("userId"),
+                json.getOrDefault("template", "hotel"),
+                json.get("deviceIp"),
+                json.get("deviceUuid"),
+                json.get("deviceFingerprint"),
+                json.get("userAgent"),
                 json.get("firstName"),
                 json.get("lastName"),
                 parseInt(json.get("age")),

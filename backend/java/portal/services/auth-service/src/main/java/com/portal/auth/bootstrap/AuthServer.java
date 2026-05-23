@@ -13,6 +13,7 @@ import com.portal.auth.application.port.out.AsyncEventPublisher;
 import com.portal.auth.application.port.out.OpenWrtAccessGateway;
 import com.portal.auth.application.port.out.UserRepository;
 import com.portal.auth.application.service.AuthService;
+import com.portal.auth.application.service.RegistrationTemplatePolicy;
 import com.portal.auth.config.PortalConfig;
 import com.portal.auth.shared.SimpleToml;
 import com.sun.net.httpserver.HttpServer;
@@ -27,6 +28,7 @@ import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.function.Function;
@@ -55,7 +57,8 @@ public final class AuthServer {
                 publisher,
                 new SmtpSocketEmailSender(config.smtpHost(), config.smtpPort(), config.smtpFrom()),
                 openWrtGateway,
-                config.sessionTtlSeconds()
+                config.sessionTtlSeconds(),
+                RegistrationTemplatePolicy.fromConfig(configPath)
         );
 
         MqttCommandConsumer commandConsumer = new MqttCommandConsumer(
@@ -167,14 +170,28 @@ public final class AuthServer {
     private static PortalBootstrap buildPortalBootstrap(Path portalConfigPath, String fallbackTemplate) {
         Path repoRoot = resolveProjectRoot(portalConfigPath.toAbsolutePath());
         Map<String, String> portalCfg = SimpleToml.parseFlat(portalConfigPath);
-        String templatesCfgFile = portalCfg.getOrDefault("templates_config.file", "config/templates-config.toml");
+        String portalRaw = readFile(portalConfigPath);
+        String templatesCfgFile = parseKeyInSection(portalRaw, "templates_config", "file");
+        if (templatesCfgFile == null || templatesCfgFile.isBlank()) {
+            templatesCfgFile = portalCfg.getOrDefault("templates_config.file", "config/templates-config.toml");
+        }
         String selectedTemplate = portalCfg.getOrDefault("registration.template", fallbackTemplate);
         Path templatesCfgPath = repoRoot.resolve(templatesCfgFile).normalize();
+        String templatesCfgRaw = readFile(templatesCfgPath);
         Map<String, String> templatesCfg = SimpleToml.parseFlat(templatesCfgPath);
-        String templatesDir = templatesCfg.getOrDefault("templates.directory", "config/templates");
+        String templatesDir = parseKeyInSection(templatesCfgRaw, "templates", "directory");
+        if (templatesDir == null || templatesDir.isBlank()) {
+            templatesDir = templatesCfg.getOrDefault("templates.directory", "config/templates");
+        }
         Path templatesDirPath = repoRoot.resolve(templatesDir).normalize();
 
-        List<String> available = parseStringArray(templatesCfg.getOrDefault("templates.available", ""));
+        List<String> available = parseArrayInSection(templatesCfgRaw, "templates", "available");
+        if (available.isEmpty()) {
+            available = parseStringArray(templatesCfg.getOrDefault("templates.available", ""));
+        }
+        if (available.isEmpty()) {
+            available = listTemplateFiles(templatesDirPath);
+        }
         Map<String, TemplateData> templates = new LinkedHashMap<>();
         for (String name : available) {
             Path f = templatesDirPath.resolve(name + ".toml");
@@ -240,6 +257,102 @@ public final class AuthServer {
         Matcher m = Pattern.compile("\"([^\"]+)\"").matcher(raw == null ? "" : raw);
         while (m.find()) {
             out.add(m.group(1));
+        }
+        return out;
+    }
+
+    private static String parseKeyInSection(String toml, String section, String key) {
+        if (toml == null || toml.isBlank()) {
+            return null;
+        }
+        boolean inSection = false;
+        for (String rawLine : toml.split("\\R")) {
+            String line = rawLine.trim();
+            if (line.isEmpty() || line.startsWith("#")) {
+                continue;
+            }
+            if (line.startsWith("[") && line.endsWith("]")) {
+                String sec = line.substring(1, line.length() - 1).trim();
+                inSection = section.equals(sec);
+                continue;
+            }
+            if (!inSection) {
+                continue;
+            }
+            if (line.startsWith(key + " ")) {
+                int eq = line.indexOf('=');
+                if (eq < 0) {
+                    return null;
+                }
+                String value = line.substring(eq + 1).trim();
+                if (value.startsWith("\"") && value.endsWith("\"") && value.length() >= 2) {
+                    return value.substring(1, value.length() - 1);
+                }
+                return value;
+            }
+        }
+        return null;
+    }
+
+    private static List<String> parseArrayInSection(String toml, String section, String key) {
+        List<String> out = new ArrayList<>();
+        if (toml == null || toml.isBlank()) {
+            return out;
+        }
+        boolean inSection = false;
+        boolean inArray = false;
+        StringBuilder buf = new StringBuilder();
+        for (String rawLine : toml.split("\\R")) {
+            String line = rawLine.trim();
+            if (line.isEmpty() || line.startsWith("#")) {
+                continue;
+            }
+            if (!inArray && line.startsWith("[") && line.endsWith("]")) {
+                String sec = line.substring(1, line.length() - 1).trim();
+                inSection = section.equals(sec);
+                continue;
+            }
+            if (!inSection) {
+                continue;
+            }
+            if (!inArray) {
+                if (line.startsWith(key)) {
+                    int eq = line.indexOf('=');
+                    if (eq < 0) {
+                        continue;
+                    }
+                    String rest = line.substring(eq + 1).trim();
+                    if (rest.contains("[")) {
+                        inArray = true;
+                    }
+                    buf.append(rest);
+                    if (rest.contains("]")) {
+                        break;
+                    }
+                }
+            } else {
+                buf.append(line);
+                if (line.contains("]")) {
+                    break;
+                }
+            }
+        }
+        Matcher m = Pattern.compile("\"([^\"]+)\"").matcher(buf.toString());
+        while (m.find()) {
+            out.add(m.group(1).trim().toLowerCase(Locale.ROOT));
+        }
+        return out;
+    }
+
+    private static List<String> listTemplateFiles(Path templatesDirPath) {
+        List<String> out = new ArrayList<>();
+        try (var stream = Files.list(templatesDirPath)) {
+            stream.filter(p -> p.getFileName().toString().endsWith(".toml"))
+                    .map(p -> p.getFileName().toString().replaceFirst("\\.toml$", ""))
+                    .sorted()
+                    .forEach(out::add);
+        } catch (IOException ignored) {
+            // empty list fallback
         }
         return out;
     }

@@ -11,6 +11,7 @@ public final class InMemoryUserRepository implements UserRepository {
     private final Map<String, User> byId = new ConcurrentHashMap<>();
     private final Map<String, String> emailToId = new ConcurrentHashMap<>();
     private final Map<String, String> phoneToId = new ConcurrentHashMap<>();
+    private final Map<String, String> ipToId = new ConcurrentHashMap<>();
 
     @Override
     public void save(User user) {
@@ -20,6 +21,9 @@ public final class InMemoryUserRepository implements UserRepository {
         }
         if (user.phone() != null) {
             phoneToId.put(user.phone(), user.userId());
+        }
+        if (user.deviceIp() != null) {
+            ipToId.put(user.deviceIp(), user.userId());
         }
     }
 
@@ -32,6 +36,12 @@ public final class InMemoryUserRepository implements UserRepository {
     @Override
     public Optional<User> findByPhone(String phone) {
         String id = phoneToId.get(phone);
+        return id == null ? Optional.empty() : Optional.ofNullable(byId.get(id));
+    }
+
+    @Override
+    public Optional<User> findByDeviceIp(String deviceIp) {
+        String id = ipToId.get(deviceIp);
         return id == null ? Optional.empty() : Optional.ofNullable(byId.get(id));
     }
 }

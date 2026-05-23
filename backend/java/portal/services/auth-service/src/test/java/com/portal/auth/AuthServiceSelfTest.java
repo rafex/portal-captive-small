@@ -9,6 +9,7 @@ import com.portal.auth.application.port.out.AsyncEventPublisher;
 import com.portal.auth.application.port.out.EmailSender;
 import com.portal.auth.application.port.out.OpenWrtAccessGateway;
 import com.portal.auth.application.service.AuthService;
+import com.portal.auth.application.service.RegistrationTemplatePolicy;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -30,7 +31,7 @@ public final class AuthServiceSelfTest {
         AuthService service = service(publisher);
 
         String userId = service.register(new RegisterUserCommand(
-                "casa", "Ana", "Lopez", 28,
+                "casa", "10.0.0.11", "uuid-self-1", "fp-self-1", "ua-self-1", "Ana", "Lopez", 28,
                 "ana-selftest@example.com", "+525511110001", "+525511110001", "",
                 "", "", "", "", "Secret123"
         ));
@@ -47,7 +48,7 @@ public final class AuthServiceSelfTest {
         AuthService service = service(new TestPublisher());
         try {
             service.register(new RegisterUserCommand(
-                    "hotel", "H", "U", 25,
+                    "hotel", "10.0.0.12", "uuid-self-2", "fp-self-2", "ua-self-2", "H", "U", 25,
                     "hotel-selftest@example.com", "+525511110002", "+525511110002", "",
                     "", "", "", "", "Secret123"
             ));
@@ -60,13 +61,13 @@ public final class AuthServiceSelfTest {
     private static void shouldRejectDuplicateEmail() {
         AuthService service = service(new TestPublisher());
         service.register(new RegisterUserCommand(
-                "casa", "A", "B", 20,
+                "casa", "10.0.0.13", "uuid-self-3", "fp-self-3", "ua-self-3", "A", "B", 20,
                 "dup-selftest@example.com", "+525511110003", "+525511110003", "",
                 "", "", "", "", "Secret123"
         ));
         try {
             service.register(new RegisterUserCommand(
-                    "casa", "C", "D", 21,
+                    "casa", "10.0.0.14", "uuid-self-4", "fp-self-4", "ua-self-4", "C", "D", 21,
                     "dup-selftest@example.com", "+525511110004", "+525511110004", "",
                     "", "", "", "", "Secret123"
             ));
@@ -81,7 +82,7 @@ public final class AuthServiceSelfTest {
         AuthService service = service(new TestPublisher(), emailSender);
 
         service.register(new RegisterUserCommand(
-                "casa", "Tmp", "Pwd", 33,
+                "casa", "10.0.0.15", "uuid-self-5", "fp-self-5", "ua-self-5", "Tmp", "Pwd", 33,
                 "tmp-selftest@example.com", "+525511110005", "+525511110005", "",
                 "", "", "", "", "Initial123"
         ));
@@ -108,7 +109,8 @@ public final class AuthServiceSelfTest {
                 publisher,
                 emailSender,
                 new NoopOpenWrtGateway(),
-                3600
+                3600,
+                new RegistrationTemplatePolicy()
         );
     }
 

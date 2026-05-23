@@ -15,6 +15,15 @@ struct Request {
     reply_topic: Option<String>,
     #[serde(rename = "userId")]
     user_id: Option<String>,
+    template: Option<String>,
+    #[serde(rename = "deviceIp")]
+    device_ip: Option<String>,
+    #[serde(rename = "deviceUuid")]
+    device_uuid: Option<String>,
+    #[serde(rename = "deviceFingerprint")]
+    device_fingerprint: Option<String>,
+    #[serde(rename = "userAgent")]
+    user_agent: Option<String>,
     #[serde(rename = "firstName")]
     first_name: Option<String>,
     #[serde(rename = "lastName")]
@@ -51,6 +60,15 @@ struct Response {
     found: Option<bool>,
     #[serde(rename = "userId")]
     user_id: Option<String>,
+    template: Option<String>,
+    #[serde(rename = "deviceIp")]
+    device_ip: Option<String>,
+    #[serde(rename = "deviceUuid")]
+    device_uuid: Option<String>,
+    #[serde(rename = "deviceFingerprint")]
+    device_fingerprint: Option<String>,
+    #[serde(rename = "userAgent")]
+    user_agent: Option<String>,
     #[serde(rename = "firstName")]
     first_name: Option<String>,
     #[serde(rename = "lastName")]
@@ -175,12 +193,21 @@ fn handle_request(conn: &Connection, payload: &str, users_ttl_seconds: i64) -> R
             Ok(resp) => resp,
             Err(e) => err_resp(request_id, format!("find_phone_failed:{e}")),
         },
+        "user_find_device_ip" => match user_find(conn, "device_ip", req.device_ip.as_deref(), request_id.clone()) {
+            Ok(resp) => resp,
+            Err(e) => err_resp(request_id, format!("find_device_ip_failed:{e}")),
+        },
         _ => err_resp(request_id, "unsupported_op".to_string()),
     }
 }
 
 fn user_save(conn: &Connection, req: &Request) -> rusqlite::Result<()> {
     let profile_json = json!({
+        "template": req.template.clone(),
+        "deviceIp": req.device_ip.clone(),
+        "deviceUuid": req.device_uuid.clone(),
+        "deviceFingerprint": req.device_fingerprint.clone(),
+        "userAgent": req.user_agent.clone(),
         "firstName": req.first_name.clone(),
         "lastName": req.last_name.clone(),
         "age": req.age,
@@ -229,6 +256,11 @@ fn user_find(conn: &Connection, field: &str, value: Option<&str>, request_id: St
             error: None,
             found: Some(false),
             user_id: None,
+            template: None,
+            device_ip: None,
+            device_uuid: None,
+            device_fingerprint: None,
+            user_agent: None,
             first_name: None,
             last_name: None,
             age: None,
@@ -247,16 +279,19 @@ fn user_find(conn: &Connection, field: &str, value: Option<&str>, request_id: St
         });
     }
 
-    let sql = if field == "email" {
-        "SELECT u.id, u.password_hash, u.password_salt, u.created_at, u.updated_at, p.profile_json
+    let sql = match field {
+        "email" => "SELECT u.id, u.password_hash, u.password_salt, u.created_at, u.updated_at, p.profile_json
          FROM users u
          LEFT JOIN user_profiles p ON p.user_id=u.id
-         WHERE json_extract(p.profile_json, '$.email')=?1 LIMIT 1"
-    } else {
-        "SELECT u.id, u.password_hash, u.password_salt, u.created_at, u.updated_at, p.profile_json
+         WHERE json_extract(p.profile_json, '$.email')=?1 LIMIT 1",
+        "device_ip" => "SELECT u.id, u.password_hash, u.password_salt, u.created_at, u.updated_at, p.profile_json
          FROM users u
          LEFT JOIN user_profiles p ON p.user_id=u.id
-         WHERE json_extract(p.profile_json, '$.phone')=?1 LIMIT 1"
+         WHERE json_extract(p.profile_json, '$.deviceIp')=?1 LIMIT 1",
+        _ => "SELECT u.id, u.password_hash, u.password_salt, u.created_at, u.updated_at, p.profile_json
+         FROM users u
+         LEFT JOIN user_profiles p ON p.user_id=u.id
+         WHERE json_extract(p.profile_json, '$.phone')=?1 LIMIT 1",
     };
 
     let mut stmt = conn.prepare(sql)?;
@@ -274,6 +309,11 @@ fn user_find(conn: &Connection, field: &str, value: Option<&str>, request_id: St
             error: None,
             found: Some(true),
             user_id: Some(row.get::<_, String>(0)?),
+            template: profile.get("template").and_then(|v| v.as_str()).map(|s| s.to_string()),
+            device_ip: profile.get("deviceIp").and_then(|v| v.as_str()).map(|s| s.to_string()),
+            device_uuid: profile.get("deviceUuid").and_then(|v| v.as_str()).map(|s| s.to_string()),
+            device_fingerprint: profile.get("deviceFingerprint").and_then(|v| v.as_str()).map(|s| s.to_string()),
+            user_agent: profile.get("userAgent").and_then(|v| v.as_str()).map(|s| s.to_string()),
             first_name: profile.get("firstName").and_then(|v| v.as_str()).map(|s| s.to_string()),
             last_name: profile.get("lastName").and_then(|v| v.as_str()).map(|s| s.to_string()),
             age: profile.get("age").and_then(|v| v.as_i64()),
@@ -298,6 +338,11 @@ fn user_find(conn: &Connection, field: &str, value: Option<&str>, request_id: St
         error: None,
         found: Some(false),
         user_id: None,
+        template: None,
+        device_ip: None,
+        device_uuid: None,
+        device_fingerprint: None,
+        user_agent: None,
         first_name: None,
         last_name: None,
         age: None,
@@ -334,6 +379,11 @@ fn ok_resp(request_id: String) -> Response {
         error: None,
         found: None,
         user_id: None,
+        template: None,
+        device_ip: None,
+        device_uuid: None,
+        device_fingerprint: None,
+        user_agent: None,
         first_name: None,
         last_name: None,
         age: None,
@@ -359,6 +409,11 @@ fn err_resp(request_id: String, err: String) -> Response {
         error: Some(err),
         found: None,
         user_id: None,
+        template: None,
+        device_ip: None,
+        device_uuid: None,
+        device_fingerprint: None,
+        user_agent: None,
         first_name: None,
         last_name: None,
         age: None,

@@ -14,6 +14,7 @@ import com.portal.auth.application.port.out.UserRepository;
 import com.portal.auth.domain.User;
 
 import java.security.SecureRandom;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.Locale;
@@ -25,20 +26,22 @@ public final class AuthService implements RegisterUserUseCase, LoginUseCase, Iss
     private final EmailSender emailSender;
     private final OpenWrtAccessGateway openWrtAccessGateway;
     private final int sessionTtlSeconds;
-    private final RegistrationTemplatePolicy registrationTemplatePolicy = new RegistrationTemplatePolicy();
+    private final RegistrationTemplatePolicy registrationTemplatePolicy;
 
     public AuthService(UserRepository userRepository,
                        PasswordHasher passwordHasher,
                        AsyncEventPublisher asyncEventPublisher,
                        EmailSender emailSender,
                        OpenWrtAccessGateway openWrtAccessGateway,
-                       int sessionTtlSeconds) {
+                       int sessionTtlSeconds,
+                       RegistrationTemplatePolicy registrationTemplatePolicy) {
         this.userRepository = userRepository;
         this.passwordHasher = passwordHasher;
         this.asyncEventPublisher = asyncEventPublisher;
         this.emailSender = emailSender;
         this.openWrtAccessGateway = openWrtAccessGateway;
         this.sessionTtlSeconds = sessionTtlSeconds;
+        this.registrationTemplatePolicy = registrationTemplatePolicy;
     }
 
     @Override
@@ -58,6 +61,11 @@ public final class AuthService implements RegisterUserUseCase, LoginUseCase, Iss
         String salt = passwordHasher.salt();
         String hash = passwordHasher.hash(command.rawPassword(), salt);
         User user = User.newUser(
+                normalize(command.template()),
+                normalize(command.deviceIp()),
+                normalize(command.deviceUuid()),
+                normalize(command.deviceFingerprint()),
+                normalize(command.userAgent()),
                 command.firstName(),
                 command.lastName(),
                 command.age(),
@@ -97,6 +105,13 @@ public final class AuthService implements RegisterUserUseCase, LoginUseCase, Iss
             return new LoginResult(false, null, "invalid_password");
         }
 
+        userRepository.save(new User(
+                user.userId(), user.template(), user.deviceIp(), user.deviceUuid(), user.deviceFingerprint(), user.userAgent(),
+                user.firstName(), user.lastName(), user.age(), user.email(), user.phone(),
+                user.mobile(), user.address(), user.socialFacebook(), user.socialInstagram(), user.socialTiktok(),
+                user.socialX(), user.passwordHash(), user.passwordSalt(), user.createdAt(), Instant.now()
+        ));
+
         String reason = "ok";
         try {
             openWrtAccessGateway.allowSession(user.userId(), sessionTtlSeconds);
@@ -123,13 +138,27 @@ public final class AuthService implements RegisterUserUseCase, LoginUseCase, Iss
         String salt = passwordHasher.salt();
         String hash = passwordHasher.hash(temporaryPassword, salt);
         User updated = new User(
-                user.userId(), user.firstName(), user.lastName(), user.age(), user.email(), user.phone(),
+                user.userId(), user.template(), user.deviceIp(), user.deviceUuid(), user.deviceFingerprint(), user.userAgent(), user.firstName(), user.lastName(), user.age(), user.email(), user.phone(),
                 user.mobile(), user.address(), user.socialFacebook(), user.socialInstagram(), user.socialTiktok(),
                 user.socialX(), hash, salt, user.createdAt(), Instant.now());
 
         userRepository.save(updated);
         emailSender.sendTemporaryPassword(normalizedEmail, temporaryPassword);
         return temporaryPassword;
+    }
+
+    public AccessState accessStateByDeviceIp(String deviceIp) {
+        String normalizedIp = normalize(deviceIp);
+        if (normalizedIp == null) {
+            return new AccessState(false, 0, null);
+        }
+        User user = userRepository.findByDeviceIp(normalizedIp).orElse(null);
+        if (user == null) {
+            return new AccessState(false, 0, null);
+        }
+        long elapsed = Duration.between(user.updatedAt(), Instant.now()).getSeconds();
+        long remaining = Math.max(0, sessionTtlSeconds - elapsed);
+        return new AccessState(remaining > 0, remaining, user.userId());
     }
 
     private static String normalize(String value) {
@@ -148,5 +177,8 @@ public final class AuthService implements RegisterUserUseCase, LoginUseCase, Iss
             return "unknown";
         }
         return value.replace("\"", "'");
+    }
+
+    public record AccessState(boolean active, long remainingSeconds, String userId) {
     }
 }

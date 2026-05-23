@@ -25,7 +25,7 @@ services:
       - portal-net
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "mosquitto_pub", "-t", "health", "-m", "ping", "-q"]
+      test: ["CMD", "mosquitto_pub", "-h", "127.0.0.1", "-p", "1883", "-t", "health", "-m", "ping", "-q", "0"]
       interval: 10s
       timeout: 5s
       retries: 3

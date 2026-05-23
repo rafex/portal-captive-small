@@ -6,6 +6,11 @@ import java.util.UUID;
 
 public record User(
         String userId,
+        String template,
+        String deviceIp,
+        String deviceUuid,
+        String deviceFingerprint,
+        String userAgent,
         String firstName,
         String lastName,
         Integer age,
@@ -24,20 +29,22 @@ public record User(
 ) {
     public User {
         Objects.requireNonNull(userId, "userId");
-        Objects.requireNonNull(firstName, "firstName");
-        Objects.requireNonNull(lastName, "lastName");
-        Objects.requireNonNull(passwordHash, "passwordHash");
-        Objects.requireNonNull(passwordSalt, "passwordSalt");
+        Objects.requireNonNull(template, "template");
         Objects.requireNonNull(createdAt, "createdAt");
         Objects.requireNonNull(updatedAt, "updatedAt");
     }
 
-    public static User newUser(String firstName, String lastName, Integer age, String email, String phone,
+    public static User newUser(String template, String deviceIp, String deviceUuid, String deviceFingerprint, String userAgent, String firstName, String lastName, Integer age, String email, String phone,
                                String mobile, String address, String socialFacebook, String socialInstagram,
                                String socialTiktok, String socialX, String passwordHash, String passwordSalt) {
         Instant now = Instant.now();
         return new User(
                 UUID.randomUUID().toString(),
+                template,
+                deviceIp,
+                deviceUuid,
+                deviceFingerprint,
+                userAgent,
                 firstName,
                 lastName,
                 age,

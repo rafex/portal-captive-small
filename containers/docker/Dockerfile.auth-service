@@ -32,6 +32,9 @@ FROM eclipse-temurin:25-jre-alpine AS runtime-jvm
 
 WORKDIR /app
 
+# Requerido por el repositorio mqtt_rust (usa mosquitto_sub/mosquitto_pub vía ProcessBuilder).
+RUN apk add --no-cache mosquitto-clients
+
 COPY --from=builder /src/services/auth-service/target/auth-service-0.1.0.jar app.jar
 COPY config/ config/
 COPY sql/   sql/

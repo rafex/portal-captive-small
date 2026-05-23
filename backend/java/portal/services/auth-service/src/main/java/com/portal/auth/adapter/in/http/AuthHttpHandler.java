@@ -7,6 +7,7 @@ import com.portal.auth.application.port.in.LoginResult;
 import com.portal.auth.application.port.in.LoginUseCase;
 import com.portal.auth.application.port.in.RegisterUserCommand;
 import com.portal.auth.application.port.in.RegisterUserUseCase;
+import com.portal.auth.application.service.AuthService;
 import com.portal.auth.shared.SimpleJson;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
@@ -29,6 +30,7 @@ public final class AuthHttpHandler implements HttpHandler {
     private final Function<String, byte[]> assetBytesSupplier;
     private final String portalBootstrapJson;
     private final Set<String> allowedTemplates;
+    private final AuthService authService;
 
     public AuthHttpHandler(RegisterUserUseCase registerUserUseCase,
                            LoginUseCase loginUseCase,
@@ -50,6 +52,7 @@ public final class AuthHttpHandler implements HttpHandler {
         this.assetBytesSupplier = assetBytesSupplier;
         this.portalBootstrapJson = portalBootstrapJson;
         this.allowedTemplates = allowedTemplates;
+        this.authService = registerUserUseCase instanceof AuthService s ? s : null;
     }
 
     @Override
@@ -94,6 +97,10 @@ public final class AuthHttpHandler implements HttpHandler {
                 writeJson(exchange, 200, "{\"status\":\"ok\"}");
                 return;
             }
+            if ("/auth/access/state".equals(path) && "GET".equals(method)) {
+                accessState(exchange);
+                return;
+            }
             if ("/health/db-mqtt".equals(path) && "GET".equals(method)) {
                 boolean healthy = dbMqttHealthSupplier.get();
                 writeJson(exchange, healthy ? 200 : 503,
@@ -109,10 +116,12 @@ public final class AuthHttpHandler implements HttpHandler {
                 return;
             }
             if ("/auth/register".equals(path) && "POST".equals(method)) {
+                requirePolicyConsent(exchange);
                 register(exchange);
                 return;
             }
             if ("/auth/login".equals(path) && "POST".equals(method)) {
+                requirePolicyConsent(exchange);
                 login(exchange);
                 return;
             }
@@ -133,6 +142,10 @@ public final class AuthHttpHandler implements HttpHandler {
         Map<String, String> json = SimpleJson.parseFlatObject(body);
         RegisterUserCommand command = new RegisterUserCommand(
                 json.get("template"),
+                remoteIp(exchange),
+                headerOrNull(exchange, "X-Device-UUID"),
+                headerOrNull(exchange, "X-Device-Fingerprint"),
+                headerOrNull(exchange, "X-Device-UA"),
                 json.get("firstName"),
                 json.get("lastName"),
                 parseInt(json.get("age")),
@@ -148,6 +161,17 @@ public final class AuthHttpHandler implements HttpHandler {
         );
         String userId = registerUserUseCase.register(command);
         writeJson(exchange, 201, "{\"userId\":\"" + userId + "\"}");
+    }
+
+    private void accessState(HttpExchange exchange) throws IOException {
+        String ip = remoteIp(exchange);
+        if (authService == null) {
+            writeJson(exchange, 200, "{\"active\":false,\"remainingSeconds\":0}");
+            return;
+        }
+        AuthService.AccessState state = authService.accessStateByDeviceIp(ip);
+        writeJson(exchange, 200, "{\"active\":" + state.active() + ",\"remainingSeconds\":" + state.remainingSeconds() +
+                ",\"userId\":\"" + safe(state.userId()) + "\"}");
     }
 
     private void login(HttpExchange exchange) throws IOException {
@@ -204,7 +228,10 @@ public final class AuthHttpHandler implements HttpHandler {
     private static void addCors(HttpExchange exchange) {
         exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
         exchange.getResponseHeaders().set("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-        exchange.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type");
+        exchange.getResponseHeaders().set(
+                "Access-Control-Allow-Headers",
+                "Content-Type,X-Terms-Accepted,X-Cookies-Accepted,X-Device-UUID,X-Device-Fingerprint,X-Device-UA,X-Forwarded-For"
+        );
     }
 
     private static Integer parseInt(String raw) {
@@ -216,6 +243,31 @@ public final class AuthHttpHandler implements HttpHandler {
 
     private static String safe(String value) {
         return value == null ? "" : value;
+    }
+
+    private static String remoteIp(HttpExchange exchange) {
+        String xff = exchange.getRequestHeaders().getFirst("X-Forwarded-For");
+        if (xff != null && !xff.isBlank()) {
+            return xff.split(",")[0].trim();
+        }
+        if (exchange.getRemoteAddress() != null && exchange.getRemoteAddress().getAddress() != null) {
+            return exchange.getRemoteAddress().getAddress().getHostAddress();
+        }
+        return "";
+    }
+
+    private static String headerOrNull(HttpExchange exchange, String name) {
+        String v = exchange.getRequestHeaders().getFirst(name);
+        if (v == null || v.isBlank()) return null;
+        return v.trim();
+    }
+
+    private static void requirePolicyConsent(HttpExchange exchange) {
+        String terms = headerOrNull(exchange, "X-Terms-Accepted");
+        String cookies = headerOrNull(exchange, "X-Cookies-Accepted");
+        if (!"true".equalsIgnoreCase(terms) || !"true".equalsIgnoreCase(cookies)) {
+            throw new IllegalArgumentException("policy_not_accepted");
+        }
     }
 
     private static void writeJson(HttpExchange exchange, int status, String body) throws IOException {

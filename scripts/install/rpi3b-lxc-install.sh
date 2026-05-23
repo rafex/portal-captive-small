@@ -30,16 +30,12 @@ verify_checksum() {
 mkdir -p "$DIST_DIR" "$INSTALL_ROOT"
 cd "$DIST_DIR"
 
-curl -fsSLO "${BASE_URL}/frontend-${VERSION#v}.tar.gz"
-curl -fsSLO "${BASE_URL}/frontend-${VERSION#v}.tar.gz.sha256"
 curl -fsSLO "${BASE_URL}/backend-${VERSION#v}-${ARCH}.tar.gz"
 curl -fsSLO "${BASE_URL}/backend-${VERSION#v}-${ARCH}.tar.gz.sha256"
 curl -fsSLO "${BASE_URL}/script-install.sh"
 
-verify_checksum "frontend-${VERSION#v}.tar.gz" "frontend-${VERSION#v}.tar.gz.sha256"
 verify_checksum "backend-${VERSION#v}-${ARCH}.tar.gz" "backend-${VERSION#v}-${ARCH}.tar.gz.sha256"
 
-tar -xzf "frontend-${VERSION#v}.tar.gz" -C "$INSTALL_ROOT"
 tar -xzf "backend-${VERSION#v}-${ARCH}.tar.gz" -C "$INSTALL_ROOT"
 
 install -m 0755 "${PWD}/script-install.sh" "$INSTALL_ROOT/script-install.sh"

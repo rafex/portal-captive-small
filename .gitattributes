@@ -1,0 +1,21 @@
+# Normalizar todos los archivos de texto a LF en el repositorio
+* text=auto eol=lf
+
+# Scripts Windows: preservar CRLF
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# Scripts Unix: forzar LF
+*.sh  text eol=lf
+
+# Binarios: sin conversión
+*.jar binary
+*.so  binary
+*.db  binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.zip binary
+*.gz  binary

@@ -1,0 +1,8 @@
+# Mosquitto mínimo para desarrollo local
+FROM eclipse-mosquitto:2.0
+
+# Copiar configuración si existe; si no, usar defaults de la imagen
+COPY containers/docker/mosquitto.conf /mosquitto/config/mosquitto.conf
+
+EXPOSE 1883
+EXPOSE 9001

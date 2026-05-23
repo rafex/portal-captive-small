@@ -7,40 +7,6 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-frontend:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Build frontend
-        run: |
-          cd frontend/javascripts/portal
-          npm ci --no-audit --no-fund
-          npm run build
-
-      - name: Package frontend
-        run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          mkdir -p dist
-          tar -czf "dist/frontend-${VERSION}.tar.gz" -C frontend/javascripts/portal dist
-          (cd dist && sha256sum "frontend-${VERSION}.tar.gz" > "frontend-${VERSION}.tar.gz.sha256")
-          tar -czf "dist/frontend-id-build-${VERSION}.tar.gz" -C frontend/javascripts/portal dist
-          (cd dist && sha256sum "frontend-id-build-${VERSION}.tar.gz" > "frontend-id-build-${VERSION}.tar.gz.sha256")
-          (cd frontend/javascripts/portal && zip -rq "../../../dist/frontend-id-build-${VERSION}.zip" dist)
-          (cd dist && sha256sum "frontend-id-build-${VERSION}.zip" > "frontend-id-build-${VERSION}.zip.sha256")
-
-      - name: Upload frontend artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-release-artifacts
-          path: dist/*
-
   build-backend:
     strategy:
       fail-fast: false
@@ -148,18 +114,11 @@ jobs:
   release:
     if: startsWith(github.ref, 'refs/tags/v')
     needs:
-      - build-frontend
       - build-backend
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - name: Download frontend artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: frontend-release-artifacts
-          path: dist
-
       - name: Download backend artifacts (x86_64)
         uses: actions/download-artifact@v4
         with:

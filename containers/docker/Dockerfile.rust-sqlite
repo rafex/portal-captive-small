@@ -1,0 +1,39 @@
+# ─────────────────────────────────────────────
+# Etapa 1: compilación Rust (librería + binario)
+# ─────────────────────────────────────────────
+FROM rust:1-slim-bookworm AS builder
+
+WORKDIR /src
+
+# Cache de dependencias
+COPY backend/rust/database-conector-sqlite/Cargo.toml ./Cargo.toml
+RUN mkdir -p src && \
+    echo 'fn main(){}' > src/main.rs && \
+    echo 'pub fn placeholder(){}' > src/lib.rs && \
+    cargo build --release 2>/dev/null || true && \
+    rm -f src/main.rs src/lib.rs
+
+# Código fuente real
+COPY backend/rust/database-conector-sqlite/src/ src/
+
+RUN cargo build --release
+
+# ─────────────────────────────────────────────
+# Etapa 2: runtime mínimo para db-mqtt-worker
+# ─────────────────────────────────────────────
+FROM debian:12-slim AS runtime
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    libsqlite3-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY --from=builder /src/target/release/db-mqtt-worker      ./db-mqtt-worker
+COPY --from=builder /src/target/release/libdatabase_conector_sqlite.so ./libdatabase_conector_sqlite.so
+COPY config/ config/
+
+EXPOSE 1883
+
+ENTRYPOINT ["./db-mqtt-worker"]

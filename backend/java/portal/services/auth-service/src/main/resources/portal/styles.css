@@ -4,5 +4,7 @@ section { background: #fff; border: 1px solid #e5e7eb; border-radius: .75rem; pa
 h1,h2 { margin: 0 0 .75rem 0; }
 form { display: grid; gap: .5rem; }
 input,button { font: inherit; padding: .6rem .7rem; border-radius: .5rem; border: 1px solid #d1d5db; }
-button { background: #0f766e; color: #fff; border-color: #0f766e; cursor: pointer; }
+button { background: var(--portal-primary, #0f766e); color: #fff; border-color: var(--portal-primary, #0f766e); cursor: pointer; }
 #status { min-height: 1.25rem; }
+.portal-hero { display: flex; align-items: center; gap: .75rem; margin-bottom: .75rem; }
+.portal-logo { width: 48px; height: 48px; object-fit: contain; border-radius: .5rem; background: #fff; padding: .2rem; border: 1px solid #e5e7eb; }

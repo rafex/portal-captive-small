@@ -1,5 +1,7 @@
 # Java
 **/target/
+# Excepción: el JAR del Maven wrapper debe versionarse
+!backend/java/portal/.mvn/wrapper/maven-wrapper.jar
 
 # Node
 **/node_modules/

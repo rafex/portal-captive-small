@@ -6,7 +6,11 @@ import java.util.Locale;
 import java.util.Set;
 
 final class RegistrationTemplatePolicy {
-    private static final Set<String> ALLOWED = Set.of("hotel", "restaurante", "escuela", "casa", "personalizado");
+    private static final Set<String> ALLOWED = Set.of(
+            "hotel", "restaurant", "restaurante", "school", "escuela", "casa", "personalizado",
+            "coworking", "cafe", "airport", "mall", "library", "hospital", "gym", "event",
+            "community_mesh", "university", "gaming"
+    );
 
     void validate(RegisterUserCommand command) {
         String template = normalize(command.template());
@@ -14,32 +18,45 @@ final class RegistrationTemplatePolicy {
             throw new IllegalArgumentException("invalid_template");
         }
 
-        require(command.firstName(), "first_name_required");
-        require(command.lastName(), "last_name_required");
-        require(command.rawPassword(), "password_required");
-
-        if (isBlank(command.email()) && isBlank(command.phone())) {
-            throw new IllegalArgumentException("email_or_phone_required");
+        if (isBlank(command.firstName()) && isBlank(command.email()) && isBlank(command.phone()) && isBlank(command.mobile())) {
+            throw new IllegalArgumentException("identity_required");
         }
 
         switch (template) {
             case "hotel" -> {
+                require(command.firstName(), "first_name_required");
+                require(command.lastName(), "last_name_required");
+                require(command.rawPassword(), "password_required");
+                require(command.email(), "email_required_hotel");
                 require(command.address(), "address_required_hotel");
                 require(command.mobile(), "mobile_required_hotel");
             }
-            case "restaurante" -> {
+            case "restaurante", "restaurant" -> {
+                require(command.email(), "email_required_restaurante");
                 require(command.address(), "address_required_restaurante");
                 require(command.phone(), "phone_required_restaurante");
             }
-            case "escuela" -> {
+            case "escuela", "school" -> {
+                require(command.firstName(), "first_name_required");
+                require(command.lastName(), "last_name_required");
+                require(command.rawPassword(), "password_required");
                 require(command.email(), "email_required_escuela");
                 if (command.age() == null || command.age() < 5) {
                     throw new IllegalArgumentException("age_required_escuela");
                 }
             }
-            case "casa" -> require(command.mobile(), "mobile_required_casa");
+            case "casa" -> {
+                require(command.firstName(), "first_name_required");
+                require(command.lastName(), "last_name_required");
+                require(command.rawPassword(), "password_required");
+                require(command.mobile(), "mobile_required_casa");
+            }
             case "personalizado" -> {
                 // intentionally minimal; shared baseline validation already applied
+            }
+            case "coworking", "cafe", "airport", "mall", "library", "hospital", "gym", "event",
+                 "community_mesh", "university", "gaming" -> {
+                // baseline-only validation for dynamic templates.
             }
             default -> throw new IllegalArgumentException("invalid_template");
         }

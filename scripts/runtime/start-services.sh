@@ -25,12 +25,11 @@ if [[ -f "${ROOT_DIR}/backend/config/portal-config.toml" ]]; then
 fi
 
 mkdir -p /tmp /run "${ROOT_DIR}/data"
-rm -f /tmp/mosquitto.log /tmp/db-worker.log /tmp/auth-service.log /tmp/frontend.log
+rm -f /tmp/mosquitto.log /tmp/db-worker.log /tmp/auth-service.log
 : > /tmp/mosquitto.log
 : > /tmp/db-worker.log
 : > /tmp/auth-service.log
-: > /tmp/frontend.log
-rm -f /run/portal-mosquitto.pid /run/portal-db-worker.pid /run/portal-auth.pid /run/portal-frontend.pid
+rm -f /run/portal-mosquitto.pid /run/portal-db-worker.pid /run/portal-auth.pid
 
 if mosquitto_pub -h 127.0.0.1 -p "${BROKER_PORT}" -t portal/health -n >/dev/null 2>&1; then
   echo 0 >/run/portal-mosquitto.pid
@@ -53,19 +52,6 @@ echo $! >/run/portal-db-worker.pid
 cd "${ROOT_DIR}"
 nohup "${ROOT_DIR}/backend/bin/auth-service-${ARCH}" backend/config/portal-config.toml >/tmp/auth-service.log 2>&1 </dev/null &
 echo $! >/run/portal-auth.pid
-
-FRONT_DIR=''
-for d in "${ROOT_DIR}/dist" "${ROOT_DIR}/frontend/dist" "${ROOT_DIR}/frontend/javascripts/portal/dist"; do
-  if [[ -d "$d" && -f "$d/index.html" ]]; then
-    FRONT_DIR="$d"
-    break
-  fi
-done
-if [[ -n "$FRONT_DIR" ]]; then
-  cd "$FRONT_DIR"
-  nohup python3 -m http.server 80 >/tmp/frontend.log 2>&1 </dev/null &
-  echo $! >/run/portal-frontend.pid
-fi
 
 sleep 2
 [[ "$(cat /run/portal-mosquitto.pid)" = "0" ]] || kill -0 "$(cat /run/portal-mosquitto.pid)"

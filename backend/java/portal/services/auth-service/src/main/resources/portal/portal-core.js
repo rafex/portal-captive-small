@@ -2,11 +2,15 @@ export function mountPortal(rootNode, options = {}) {
   const apiBaseUrl = options.apiBaseUrl || "";
   const boot = window.__PORTAL_CONFIG__ || {};
   const selectedTemplate = String(boot.selectedTemplate || "hotel").toLowerCase();
-  const templateSpec = (boot.templates && boot.templates[selectedTemplate]) || [];
+  const templateData = (boot.templates && boot.templates[selectedTemplate]) || {};
+  const templateSpec = templateData.fields || [];
 
   rootNode.innerHTML = `
     <main>
-      <h1>Portal Cautivo</h1>
+      <header class="portal-hero">
+        ${templateData.logo ? `<img class="portal-logo" src="${templateData.logo}" alt="${templateData.title || selectedTemplate} logo" />` : ""}
+        <h1>${templateData.title || "Portal Cautivo"}</h1>
+      </header>
       <p id="status" aria-live="polite"></p>
 
       <section>
@@ -89,6 +93,16 @@ export function mountPortal(rootNode, options = {}) {
       throw new Error(body.error || `http_${response.status}`);
     }
     return body;
+  }
+
+  if (templateData.background) {
+    rootNode.style.backgroundImage = `linear-gradient(rgba(255,255,255,.84), rgba(255,255,255,.84)), url('${templateData.background}')`;
+    rootNode.style.backgroundSize = "cover";
+    rootNode.style.backgroundPosition = "center";
+  }
+
+  if (templateData.primaryColor) {
+    rootNode.style.setProperty("--portal-primary", templateData.primaryColor);
   }
 
   const fields = templateSpec.length > 0 ? templateSpec : [

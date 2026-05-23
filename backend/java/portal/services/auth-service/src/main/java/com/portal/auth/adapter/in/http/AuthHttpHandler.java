@@ -13,53 +13,43 @@ import com.sun.net.httpserver.HttpHandler;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedHashSet;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.function.Supplier;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public final class AuthHttpHandler implements HttpHandler {
-    private static final Pattern TEMPLATE_SECTION_PATTERN = Pattern.compile("^\\s*\\[templates\\.([A-Za-z0-9_\\-]+)]\\s*$");
-    private static final Set<String> DEFAULT_TEMPLATES = Set.of("hotel", "restaurante", "escuela", "casa", "personalizado");
-
     private final RegisterUserUseCase registerUserUseCase;
     private final LoginUseCase loginUseCase;
     private final IssuePasswordUseCase issuePasswordUseCase;
     private final Supplier<Boolean> dbMqttHealthSupplier;
-    private final Supplier<String> portalTomlSupplier;
     private final Supplier<String> portalIndexHtmlSupplier;
     private final Supplier<String> portalCoreJsSupplier;
     private final Supplier<String> portalStylesCssSupplier;
-    private final Set<String> supportedTemplates;
-    private final Map<String, java.util.List<FieldRule>> templateFieldRules;
-    private final String registrationTemplate;
+    private final Function<String, byte[]> assetBytesSupplier;
+    private final String portalBootstrapJson;
+    private final Set<String> allowedTemplates;
 
     public AuthHttpHandler(RegisterUserUseCase registerUserUseCase,
                            LoginUseCase loginUseCase,
                            IssuePasswordUseCase issuePasswordUseCase,
                            Supplier<Boolean> dbMqttHealthSupplier,
-                           Supplier<String> portalTomlSupplier,
                            Supplier<String> portalIndexHtmlSupplier,
                            Supplier<String> portalCoreJsSupplier,
                            Supplier<String> portalStylesCssSupplier,
-                           String registrationTemplate) {
+                           Function<String, byte[]> assetBytesSupplier,
+                           String portalBootstrapJson,
+                           Set<String> allowedTemplates) {
         this.registerUserUseCase = registerUserUseCase;
         this.loginUseCase = loginUseCase;
         this.issuePasswordUseCase = issuePasswordUseCase;
         this.dbMqttHealthSupplier = dbMqttHealthSupplier;
-        this.portalTomlSupplier = portalTomlSupplier;
         this.portalIndexHtmlSupplier = portalIndexHtmlSupplier;
         this.portalCoreJsSupplier = portalCoreJsSupplier;
         this.portalStylesCssSupplier = portalStylesCssSupplier;
-        String toml = portalTomlSupplier.get();
-        this.supportedTemplates = parseTemplatesFromToml(toml);
-        this.templateFieldRules = parseTemplateFieldRulesFromToml(toml);
-        this.registrationTemplate = normalizeTemplate(registrationTemplate, supportedTemplates);
+        this.assetBytesSupplier = assetBytesSupplier;
+        this.portalBootstrapJson = portalBootstrapJson;
+        this.allowedTemplates = allowedTemplates;
     }
 
     @Override
@@ -79,12 +69,25 @@ public final class AuthHttpHandler implements HttpHandler {
                 writeText(exchange, 200, "text/html; charset=utf-8", renderPortalHtml());
                 return;
             }
+            if (path.startsWith("/portal/") && "GET".equals(method)) {
+                String tmpl = path.substring("/portal/".length()).trim().toLowerCase();
+                if (!tmpl.isEmpty() && allowedTemplates.contains(tmpl)) {
+                    writeText(exchange, 200, "text/html; charset=utf-8", renderPortalHtml(tmpl));
+                } else {
+                    writeJson(exchange, 404, "{\"error\":\"template_not_found\"}");
+                }
+                return;
+            }
             if ("/assets/styles.css".equals(path) && "GET".equals(method)) {
                 writeText(exchange, 200, "text/css; charset=utf-8", portalStylesCssSupplier.get());
                 return;
             }
             if ("/assets/portal-core.js".equals(path) && "GET".equals(method)) {
                 writeText(exchange, 200, "text/javascript; charset=utf-8", portalCoreJsSupplier.get());
+                return;
+            }
+            if (path.startsWith("/assets/") && "GET".equals(method)) {
+                serveStaticAsset(exchange, path);
                 return;
             }
             if ("/health".equals(path) && "GET".equals(method)) {
@@ -103,10 +106,6 @@ public final class AuthHttpHandler implements HttpHandler {
             }
             if ("/metrics/db-mqtt/prometheus".equals(path) && "GET".equals(method)) {
                 writeText(exchange, 200, "text/plain; version=0.0.4", DbMqttMetrics.asPrometheus());
-                return;
-            }
-            if ("/portal/config/toml".equals(path) && "GET".equals(method)) {
-                writeText(exchange, 200, "text/plain; charset=utf-8", portalTomlSupplier.get());
                 return;
             }
             if ("/auth/register".equals(path) && "POST".equals(method)) {
@@ -170,107 +169,36 @@ public final class AuthHttpHandler implements HttpHandler {
     }
 
     private String renderPortalHtml() {
-        String bootstrap = buildBootstrapJson();
-        return portalIndexHtmlSupplier.get()
-                .replace("__PORTAL_BOOTSTRAP_JSON__", bootstrap);
+        return portalIndexHtmlSupplier.get().replace("__PORTAL_BOOTSTRAP_JSON__", portalBootstrapJson);
     }
 
-    private static String normalizeTemplate(String raw, Set<String> supportedTemplates) {
-        if (raw == null) {
-            return "hotel";
-        }
-        String v = raw.trim().toLowerCase(Locale.ROOT);
-        return supportedTemplates.contains(v) ? v : "hotel";
+    private String renderPortalHtml(String templateOverride) {
+        String overridden = portalBootstrapJson.replaceFirst(
+                "\"selectedTemplate\":\"[^\"]*\"",
+                "\"selectedTemplate\":\"" + templateOverride.replace("\"", "") + "\""
+        );
+        return portalIndexHtmlSupplier.get().replace("__PORTAL_BOOTSTRAP_JSON__", overridden);
     }
 
-    private static Set<String> parseTemplatesFromToml(String toml) {
-        Set<String> out = new LinkedHashSet<>();
-        if (toml != null) {
-            String[] lines = toml.split("\\R");
-            for (String line : lines) {
-                Matcher m = TEMPLATE_SECTION_PATTERN.matcher(line);
-                if (m.matches()) {
-                    out.add(m.group(1).trim().toLowerCase(Locale.ROOT));
-                }
-            }
+    private void serveStaticAsset(HttpExchange exchange, String path) throws IOException {
+        byte[] bytes = assetBytesSupplier.apply(path);
+        if (bytes == null || bytes.length == 0) {
+            writeJson(exchange, 404, "{\"error\":\"asset_not_found\"}");
+            return;
         }
-        if (out.isEmpty()) {
-            out.addAll(DEFAULT_TEMPLATES);
-        }
-        return out;
+        String contentType = guessContentType(path);
+        exchange.getResponseHeaders().set("Content-Type", contentType);
+        exchange.sendResponseHeaders(200, bytes.length);
+        exchange.getResponseBody().write(bytes);
+        exchange.close();
     }
 
-    private static Map<String, java.util.List<FieldRule>> parseTemplateFieldRulesFromToml(String toml) {
-        Map<String, java.util.List<FieldRule>> out = new HashMap<>();
-        if (toml == null || toml.isBlank()) {
-            return out;
-        }
-        String[] lines = toml.split("\\R");
-        String currentTemplate = null;
-        for (int i = 0; i < lines.length; i++) {
-            String line = lines[i].trim();
-            Matcher section = TEMPLATE_SECTION_PATTERN.matcher(line);
-            if (section.matches()) {
-                currentTemplate = section.group(1).trim().toLowerCase(Locale.ROOT);
-                out.putIfAbsent(currentTemplate, new ArrayList<>());
-                continue;
-            }
-            if (line.startsWith("[") && line.endsWith("]") && !section.matches()) {
-                currentTemplate = null;
-                continue;
-            }
-            if (currentTemplate == null) {
-                continue;
-            }
-            if (line.startsWith("fields_enabled")) {
-                StringBuilder block = new StringBuilder(line);
-                while (!block.toString().contains("]") && i + 1 < lines.length) {
-                    i++;
-                    block.append(lines[i]);
-                }
-                Matcher pair = Pattern.compile("\\[\\s*\"([^\"]+)\"\\s*,\\s*\"([^\"]+)\"\\s*]").matcher(block.toString());
-                while (pair.find()) {
-                    out.get(currentTemplate).add(new FieldRule(pair.group(1), pair.group(2)));
-                }
-            }
-        }
-        return out;
-    }
-
-    private String buildBootstrapJson() {
-        StringBuilder sb = new StringBuilder();
-        sb.append("{");
-        sb.append("\"selectedTemplate\":\"").append(escape(registrationTemplate)).append("\",");
-        sb.append("\"templates\":{");
-        boolean firstTemplate = true;
-        for (String template : supportedTemplates) {
-            if (!firstTemplate) {
-                sb.append(",");
-            }
-            firstTemplate = false;
-            sb.append("\"").append(escape(template)).append("\":[");
-            java.util.List<FieldRule> fields = templateFieldRules.getOrDefault(template, java.util.List.of());
-            boolean firstField = true;
-            for (FieldRule field : fields) {
-                if (!firstField) {
-                    sb.append(",");
-                }
-                firstField = false;
-                sb.append("{\"field\":\"").append(escape(field.field())).append("\",\"mode\":\"")
-                        .append(escape(field.mode())).append("\"}");
-            }
-            sb.append("]");
-        }
-        sb.append("}");
-        sb.append("}");
-        return sb.toString();
-    }
-
-    private static String escape(String value) {
-        if (value == null) {
-            return "";
-        }
-        return value.replace("\\", "\\\\").replace("\"", "\\\"");
+    private static String guessContentType(String path) {
+        if (path.endsWith(".png")) return "image/png";
+        if (path.endsWith(".jpg") || path.endsWith(".jpeg")) return "image/jpeg";
+        if (path.endsWith(".svg")) return "image/svg+xml";
+        if (path.endsWith(".webp")) return "image/webp";
+        return "application/octet-stream";
     }
 
     private static void addCors(HttpExchange exchange) {
@@ -300,8 +228,5 @@ public final class AuthHttpHandler implements HttpHandler {
         exchange.sendResponseHeaders(status, bytes.length);
         exchange.getResponseBody().write(bytes);
         exchange.close();
-    }
-
-    private record FieldRule(String field, String mode) {
     }
 }

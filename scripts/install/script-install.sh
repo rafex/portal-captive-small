@@ -25,15 +25,11 @@ verify_checksum() {
   fi
 }
 
-curl -fsSLO "${BASE_URL}/frontend-${VER_NO_V}.tar.gz"
-curl -fsSLO "${BASE_URL}/frontend-${VER_NO_V}.tar.gz.sha256"
 curl -fsSLO "${BASE_URL}/backend-${VER_NO_V}-${ARCH}.tar.gz"
 curl -fsSLO "${BASE_URL}/backend-${VER_NO_V}-${ARCH}.tar.gz.sha256"
 
-verify_checksum "frontend-${VER_NO_V}.tar.gz" "frontend-${VER_NO_V}.tar.gz.sha256"
 verify_checksum "backend-${VER_NO_V}-${ARCH}.tar.gz" "backend-${VER_NO_V}-${ARCH}.tar.gz.sha256"
 
-tar -xzf "frontend-${VER_NO_V}.tar.gz"
 tar -xzf "backend-${VER_NO_V}-${ARCH}.tar.gz"
 
 echo "Instalación base completada para ${VERSION} (${ARCH})"

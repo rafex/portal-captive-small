@@ -9,7 +9,6 @@ dump_debug() {
   lxc-attach -n "${LXC_NAME:-portal-captive}" -- bash -lc "echo '--- /tmp/mosquitto.log'; tail -n 120 /tmp/mosquitto.log || true"
   lxc-attach -n "${LXC_NAME:-portal-captive}" -- bash -lc "echo '--- /tmp/db-worker.log'; tail -n 120 /tmp/db-worker.log || true"
   lxc-attach -n "${LXC_NAME:-portal-captive}" -- bash -lc "echo '--- /tmp/auth-service.log'; tail -n 120 /tmp/auth-service.log || true"
-  lxc-attach -n "${LXC_NAME:-portal-captive}" -- bash -lc "echo '--- /tmp/frontend.log'; tail -n 120 /tmp/frontend.log || true"
 }
 
 if [[ "${EUID}" -ne 0 ]]; then
@@ -128,8 +127,6 @@ if [[ "$HEALTH_OK" -ne 1 ]]; then
   dump_debug
   exit 1
 fi
-
-lxc-attach -n "$LXC_NAME" -- bash -lc "if [[ -f /run/portal-frontend.pid ]]; then kill -0 \$(cat /run/portal-frontend.pid) >/dev/null 2>&1; fi"
 
 # Optionally configure UFW bridge/NAT on host after container is healthy.
 if [[ "${AUTO_CONFIG_UFW_BRIDGE:-1}" == "1" ]] && command -v ufw >/dev/null 2>&1; then

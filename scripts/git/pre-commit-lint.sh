@@ -78,13 +78,4 @@ if has_match '^backend/rust/.*\.rs$'; then
   )
 fi
 
-if has_match '^frontend/javascripts/portal/.*\.(js|mjs|cjs|ts|tsx|css|html)$'; then
-  echo "[pre-commit] frontend build check"
-  (
-    cd frontend/javascripts/portal
-    npm ci --no-audit --no-fund
-    npm run build
-  )
-fi
-
 echo "[pre-commit] OK"

@@ -64,3 +64,47 @@ tag-push tag:
 tag-repush tag:
     git push origin :refs/tags/{{tag}} || true
     git push origin {{tag}}
+
+# ── Docker / Podman (stack local macOS) ──────────────────────────────────────
+# El frontend está embebido en auth-service (src/main/resources/portal/).
+# Un solo puerto expone portal + API: http://localhost:8080
+
+# Compila código fuente (Java + Rust) y construye las imágenes de contenedor
+docker-build:
+    bash scripts/docker/build.sh
+
+# Construye imágenes ignorando la caché
+docker-build-no-cache:
+    bash scripts/docker/build.sh --no-cache
+
+# Levanta el stack completo en segundo plano
+docker-up:
+    bash scripts/docker/stack.sh up
+
+# Levanta el stack reconstruyendo imágenes
+docker-up-build:
+    bash scripts/docker/stack.sh up --build
+
+# Para y elimina los contenedores
+docker-down:
+    bash scripts/docker/stack.sh down
+
+# Reinicia todos los servicios
+docker-restart:
+    bash scripts/docker/stack.sh restart
+
+# Muestra logs en tiempo real (servicio opcional: mosquitto|db-mqtt-worker|auth-service|frontend)
+docker-logs svc="":
+    @if [[ -n "{{svc}}" ]]; then \
+      bash scripts/docker/stack.sh logs {{svc}}; \
+    else \
+      bash scripts/docker/stack.sh logs; \
+    fi
+
+# Lista los contenedores del stack
+docker-ps:
+    bash scripts/docker/stack.sh ps
+
+# Para el stack y elimina volúmenes de datos (destructivo)
+docker-clean:
+    bash scripts/docker/stack.sh clean

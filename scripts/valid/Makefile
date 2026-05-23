@@ -1,6 +1,6 @@
-.PHONY: run e2e concurrency mqtt-e2e backend-http-smoke backend-selftest db-mqtt-e2e auth-mqtt-rust-e2e auth-mqtt-rust-concurrency rpi3b-lxc-smoke frontend-test rust-test
+.PHONY: run e2e concurrency mqtt-e2e backend-http-smoke backend-selftest db-mqtt-e2e auth-mqtt-rust-e2e auth-mqtt-rust-concurrency rpi3b-lxc-smoke rust-test
 
-run: backend-selftest frontend-test rust-test backend-http-smoke
+run: backend-selftest rust-test backend-http-smoke
 	@echo "scripts/valid checks"
 	@echo "Quick validate complete (E2E omitted)"
 
@@ -28,11 +28,12 @@ backend-selftest:
 	cd ../../backend/java/portal && mvn -q -DskipTests test-compile
 	cd ../../backend/java/portal && java -ea -cp services/auth-service/target/test-classes:services/auth-service/target/classes com.portal.auth.AuthServiceSelfTest
 
-frontend-test:
-	cd ../../frontend/javascripts/portal && npm ci --no-audit --no-fund && npm test
-
 rust-test:
-	cd ../../backend/rust/database-conector-sqlite && cargo test --quiet
+	@if command -v cargo >/dev/null 2>&1; then \
+		cd ../../backend/rust/database-conector-sqlite && cargo test --quiet; \
+	else \
+		echo "Skipping rust-test (cargo no instalado)"; \
+	fi
 
 backend-http-smoke:
 	cd ../.. && bash scripts/valid/backend-http-smoke.sh

@@ -1,0 +1,92 @@
+# compose.yaml — stack local para macOS + Podman
+# Usar con: podman-compose up  /  podman compose up
+#
+# Contexto de build: raíz del repositorio (pasar -f containers/docker/compose.yaml desde la raíz)
+# Ejemplo: podman compose -f containers/docker/compose.yaml up --build
+
+name: portal-captive
+
+services:
+
+  # ────────────────────────────────────────────
+  # MQTT broker
+  # ────────────────────────────────────────────
+  mosquitto:
+    build:
+      context: ../..
+      dockerfile: containers/docker/Dockerfile.mosquitto
+    image: portal-captive/mosquitto:local
+    container_name: portal-mosquitto
+    ports:
+      - "1883:1883"
+    volumes:
+      - mosquitto-data:/mosquitto/data
+    networks:
+      - portal-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mosquitto_pub", "-t", "health", "-m", "ping", "-q"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ────────────────────────────────────────────
+  # Rust: db-mqtt-worker (MQTT <-> SQLite bridge)
+  # ────────────────────────────────────────────
+  db-mqtt-worker:
+    build:
+      context: ../..
+      dockerfile: containers/docker/Dockerfile.rust-sqlite
+    image: portal-captive/db-mqtt-worker:local
+    container_name: portal-db-worker
+    volumes:
+      - sqlite-data:/app/data
+      - ../../config:/app/config:ro
+    environment:
+      MQTT_HOST: mosquitto
+      MQTT_PORT: "1883"
+    networks:
+      - portal-net
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ────────────────────────────────────────────
+  # Java: auth-service (sirve también el frontend embebido)
+  # ────────────────────────────────────────────
+  auth-service:
+    build:
+      context: ../..
+      dockerfile: containers/docker/Dockerfile.auth-service
+    image: portal-captive/auth-service:local
+    container_name: portal-auth
+    ports:
+      - "8080:8080"
+    volumes:
+      - sqlite-data:/app/data
+      - ../../config:/app/config:ro
+    environment:
+      MQTT_HOST: mosquitto
+      MQTT_PORT: "1883"
+    networks:
+      - portal-net
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+      db-mqtt-worker:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  mosquitto-data:
+  sqlite-data:
+
+networks:
+  portal-net:
+    driver: bridge

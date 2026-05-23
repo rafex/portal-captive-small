@@ -17,13 +17,14 @@ COPY backend/java/portal/.mvn .mvn
 COPY backend/java/portal/mvnw ./mvnw
 RUN chmod +x mvnw
 
+# Fat JAR (usado en la etapa de runtime JVM)
+ENV MAVEN_OPTS="--enable-native-access=ALL-UNNAMED"
+
 RUN ./mvnw -f pom.xml dependency:go-offline -q || true
 
 # Código fuente
 COPY backend/java/portal/ .
 
-# Fat JAR (usado en la etapa de runtime JVM)
-ENV MAVEN_OPTS="--enable-native-access=ALL-UNNAMED"
 RUN ./mvnw -q -DskipTests package
 
 # ─────────────────────────────────────────────

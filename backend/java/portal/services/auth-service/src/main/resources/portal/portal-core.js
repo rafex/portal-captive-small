@@ -183,27 +183,30 @@ async function ensureConsent(root) {
   const saved = localStorage.getItem(COOKIE_CONSENT_KEY);
 
   const waitChoice = (modal, acceptId, rejectId, onAccept, onReject) => new Promise((resolve) => {
-    const onClick = (ev) => {
-      const t = ev.target;
-      if (!(t instanceof HTMLElement)) return;
-      if (t.id === acceptId) {
-        cleanup();
-        onAccept?.();
-        resolve(true);
-        return;
-      }
-      if (t.id === rejectId) {
-        cleanup();
-        onReject?.();
-        resolve(false);
-      }
+    const acceptBtn = root.querySelector(`#${acceptId}`);
+    const rejectBtn = root.querySelector(`#${rejectId}`);
+    if (!modal || !acceptBtn || !rejectBtn) {
+      resolve(false);
+      return;
+    }
+    const onAcceptClick = () => {
+      cleanup();
+      onAccept?.();
+      resolve(true);
+    };
+    const onRejectClick = () => {
+      cleanup();
+      onReject?.();
+      resolve(false);
     };
     const cleanup = () => {
-      modal.removeEventListener('click', onClick);
+      acceptBtn.removeEventListener('click', onAcceptClick);
+      rejectBtn.removeEventListener('click', onRejectClick);
       modal.hidden = true;
     };
     modal.hidden = false;
-    modal.addEventListener('click', onClick);
+    acceptBtn.addEventListener('click', onAcceptClick);
+    rejectBtn.addEventListener('click', onRejectClick);
   });
 
   const askCookies = () => waitChoice(

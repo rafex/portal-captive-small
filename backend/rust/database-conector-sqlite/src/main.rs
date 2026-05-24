@@ -3,6 +3,8 @@ use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::env;
+use std::fs;
+use std::path::Path;
 use std::thread;
 use std::time::Duration;
 
@@ -106,37 +108,65 @@ fn main() {
         .and_then(|v| v.parse::<i64>().ok())
         .unwrap_or(3600);
 
-    let conn = Connection::open(&db_path).expect("sqlite open failed");
-    setup_sqlite(&conn).expect("sqlite setup failed");
-
-    let mut mqtt_options = MqttOptions::new("db-mqtt-worker", mqtt_host, mqtt_port);
-    mqtt_options.set_keep_alive(Duration::from_secs(30));
-
-    let (client, mut connection) = Client::new(mqtt_options, 100);
-    client
-        .subscribe(request_topic.clone(), QoS::AtLeastOnce)
-        .expect("subscribe failed");
-
-    println!("db-mqtt-worker listening topic={}", request_topic);
-
-    for event in connection.iter() {
-        match event {
-            Ok(Event::Incoming(Incoming::Publish(msg))) => {
-                let payload = String::from_utf8_lossy(&msg.payload);
-                let response = handle_request(&conn, &payload, users_ttl_seconds);
-                let reply_topic = extract_reply_topic(&payload)
-                    .unwrap_or_else(|| "portal/db/user/response/default".to_string());
-                let body = serde_json::to_string(&response).unwrap_or_else(|_| "{\"status\":\"error\"}".to_string());
-                if let Err(e) = client.publish(reply_topic, QoS::AtLeastOnce, false, body) {
-                    eprintln!("publish response failed: {e}");
-                }
-            }
-            Ok(_) => {}
-            Err(e) => {
-                eprintln!("mqtt event error: {e}");
-                thread::sleep(Duration::from_millis(500));
+    if let Some(parent) = Path::new(&db_path).parent() {
+        if !parent.as_os_str().is_empty() {
+            if let Err(e) = fs::create_dir_all(parent) {
+                eprintln!("sqlite mkdir failed path={}: {e}", parent.display());
+                std::process::exit(1);
             }
         }
+    }
+
+    let conn = match Connection::open(&db_path) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("sqlite open failed path={db_path}: {e}");
+            std::process::exit(1);
+        }
+    };
+    if let Err(e) = setup_sqlite(&conn) {
+        eprintln!("sqlite setup failed: {e}");
+        std::process::exit(1);
+    }
+
+    loop {
+        let mut mqtt_options = MqttOptions::new("db-mqtt-worker", mqtt_host.clone(), mqtt_port);
+        mqtt_options.set_keep_alive(Duration::from_secs(30));
+
+        let (client, mut connection) = Client::new(mqtt_options, 100);
+        if let Err(e) = client.subscribe(request_topic.clone(), QoS::AtLeastOnce) {
+            eprintln!("subscribe failed: {e}");
+            thread::sleep(Duration::from_secs(1));
+            continue;
+        }
+
+        println!("db-mqtt-worker listening topic={}", request_topic);
+
+        let mut ended = true;
+        for event in connection.iter() {
+            ended = false;
+            match event {
+                Ok(Event::Incoming(Incoming::Publish(msg))) => {
+                    let payload = String::from_utf8_lossy(&msg.payload);
+                    let response = handle_request(&conn, &payload, users_ttl_seconds);
+                    let reply_topic = extract_reply_topic(&payload)
+                        .unwrap_or_else(|| "portal/db/user/response/default".to_string());
+                    let body = serde_json::to_string(&response).unwrap_or_else(|_| "{\"status\":\"error\"}".to_string());
+                    if let Err(e) = client.publish(reply_topic, QoS::AtLeastOnce, false, body) {
+                        eprintln!("publish response failed: {e}");
+                    }
+                }
+                Ok(_) => {}
+                Err(e) => {
+                    eprintln!("mqtt event error: {e}");
+                    thread::sleep(Duration::from_millis(500));
+                }
+            }
+        }
+        if ended {
+            eprintln!("mqtt connection ended; reconnecting");
+        }
+        thread::sleep(Duration::from_millis(500));
     }
 }
 

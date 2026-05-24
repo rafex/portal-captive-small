@@ -189,24 +189,30 @@ async function ensureConsent(root) {
       resolve(false);
       return;
     }
-    const onAcceptClick = () => {
-      cleanup();
-      onAccept?.();
-      resolve(true);
-    };
-    const onRejectClick = () => {
-      cleanup();
-      onReject?.();
-      resolve(false);
-    };
-    const cleanup = () => {
-      acceptBtn.removeEventListener('click', onAcceptClick);
-      rejectBtn.removeEventListener('click', onRejectClick);
+
+    const finish = (ok) => {
       modal.hidden = true;
+      onAccept && ok && onAccept();
+      onReject && !ok && onReject();
+      resolve(ok);
     };
+
+    const onAcceptClick = (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      finish(true);
+    };
+    const onRejectClick = (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      finish(false);
+    };
+
     modal.hidden = false;
-    acceptBtn.addEventListener('click', onAcceptClick);
-    rejectBtn.addEventListener('click', onRejectClick);
+    acceptBtn.style.cursor = 'pointer';
+    rejectBtn.style.cursor = 'pointer';
+    acceptBtn.addEventListener('click', onAcceptClick, { once: true });
+    rejectBtn.addEventListener('click', onRejectClick, { once: true });
   });
 
   const askCookies = () => waitChoice(

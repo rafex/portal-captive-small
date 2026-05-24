@@ -1,6 +1,7 @@
 set shell := ["bash", "-cu"]
 
 version := "0.1.0"
+repo_root := justfile_directory()
 
 validate:
     make validate
@@ -87,8 +88,16 @@ docker-up-build:
 
 # Fuerza rebuild sin caché y recrea contenedores
 docker-up-rebuild:
-    podman compose -f containers/docker/compose.yaml build --no-cache
-    podman compose -f containers/docker/compose.yaml up -d --force-recreate
+    podman pull docker.io/library/eclipse-mosquitto:2.0 && podman tag docker.io/library/eclipse-mosquitto:2.0 eclipse-mosquitto:2.0
+    podman pull docker.io/library/maven:3.9.9-eclipse-temurin-21 && podman tag docker.io/library/maven:3.9.9-eclipse-temurin-21 maven:3.9.9-eclipse-temurin-21
+    podman pull docker.io/library/rust:1-slim-bookworm && podman tag docker.io/library/rust:1-slim-bookworm rust:1-slim-bookworm
+    podman pull docker.io/library/debian:12-slim && podman tag docker.io/library/debian:12-slim debian:12-slim
+    podman pull docker.io/library/eclipse-temurin:25-jre-alpine && podman tag docker.io/library/eclipse-temurin:25-jre-alpine eclipse-temurin:25-jre-alpine
+    podman build --no-cache -t portal-captive/mosquitto:local -f containers/docker/Dockerfile.mosquitto .
+    podman build --no-cache -t portal-captive/db-mqtt-worker:local -f containers/docker/Dockerfile.rust-sqlite .
+    podman build --no-cache -t portal-captive/auth-service:local -f containers/docker/Dockerfile.auth-service .
+    podman compose -f containers/docker/compose.yaml down --remove-orphans || true
+    podman compose -f containers/docker/compose.yaml up -d --no-build --force-recreate
 
 # Alias corto: levanta stack reconstruyendo imágenes en detached
 docker-up-build-detached:

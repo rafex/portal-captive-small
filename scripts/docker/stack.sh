@@ -37,7 +37,7 @@ _ensure_machine() {
 }
 
 _compose() {
-  podman compose -f "${COMPOSE_FILE}" "$@"
+  HOST_CONFIG_DIR="${REPO_ROOT}/config" podman compose -f "${COMPOSE_FILE}" "$@"
 }
 
 cd "${REPO_ROOT}"

@@ -11,6 +11,7 @@ button.secondary { background: #fff; border-color: #d1d5db; }
 .portal-hero { display: flex; align-items: center; gap: .75rem; margin-bottom: .75rem; }
 .portal-logo { width: 48px; height: 48px; object-fit: contain; border-radius: .5rem; background: #fff; padding: .2rem; border: 1px solid #e5e7eb; }
 .portal-modal-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, .55); display: grid; place-items: center; z-index: 9999; }
+.portal-modal-backdrop[hidden] { display: none !important; }
 .portal-modal { background: #fff; width: min(780px, calc(100vw - 2rem)); max-height: 80vh; overflow: auto; padding: 1rem; border-radius: .75rem; border: 1px solid #d1d5db; }
 .portal-policy { white-space: pre-wrap; font-size: .85rem; line-height: 1.35; background: #f8fafc; padding: .75rem; border-radius: .5rem; border: 1px solid #e2e8f0; }
 .portal-actions { display: flex; gap: .5rem; justify-content: flex-end; margin-top: .75rem; }

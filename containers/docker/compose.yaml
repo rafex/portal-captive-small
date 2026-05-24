@@ -41,7 +41,6 @@ services:
     container_name: portal-db-worker
     volumes:
       - sqlite-data:/app/data
-      - ../../config:/app/config:ro
     environment:
       MQTT_HOST: mosquitto
       MQTT_PORT: "1883"
@@ -65,7 +64,6 @@ services:
       - "8080:8080"
     volumes:
       - sqlite-data:/app/data
-      - ../../config:/app/config:ro
     environment:
       MQTT_HOST: mosquitto
       MQTT_PORT: "1883"

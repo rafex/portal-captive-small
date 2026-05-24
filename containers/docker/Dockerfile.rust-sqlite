@@ -5,18 +5,14 @@ FROM rust:1-slim-bookworm AS builder
 
 WORKDIR /src
 
-# Cache de dependencias
+# Código del crate (worker + librería)
 COPY backend/rust/database-conector-sqlite/Cargo.toml ./Cargo.toml
-RUN mkdir -p src && \
-    echo 'fn main(){}' > src/main.rs && \
-    echo 'pub fn placeholder(){}' > src/lib.rs && \
-    cargo build --release 2>/dev/null || true && \
-    rm -f src/main.rs src/lib.rs
-
-# Código fuente real
+COPY backend/rust/database-conector-sqlite/Cargo.lock ./Cargo.lock
 COPY backend/rust/database-conector-sqlite/src/ src/
 
-RUN cargo build --release
+RUN test -s src/main.rs && \
+    grep -q "db-mqtt-worker listening" src/main.rs && \
+    cargo build --release
 
 # ─────────────────────────────────────────────
 # Etapa 2: runtime mínimo para db-mqtt-worker

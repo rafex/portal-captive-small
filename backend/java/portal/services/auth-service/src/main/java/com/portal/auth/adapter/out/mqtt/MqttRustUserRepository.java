@@ -5,6 +5,7 @@ import com.portal.auth.domain.User;
 import com.portal.auth.shared.SimpleJson;
 
 import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -120,8 +121,8 @@ public final class MqttRustUserRepository implements UserRepository, AutoCloseab
                 json.get("socialX"),
                 json.get("passwordHash"),
                 json.get("passwordSalt"),
-                Instant.parse(json.get("createdAt")),
-                Instant.parse(json.get("updatedAt"))
+                parseInstantOrNow(json.get("createdAt")),
+                parseInstantOrNow(json.get("updatedAt"))
         ));
     }
 
@@ -179,6 +180,17 @@ public final class MqttRustUserRepository implements UserRepository, AutoCloseab
             return null;
         }
         return Integer.parseInt(raw);
+    }
+
+    private static Instant parseInstantOrNow(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return Instant.now();
+        }
+        try {
+            return Instant.parse(raw);
+        } catch (DateTimeParseException ignored) {
+            return Instant.now();
+        }
     }
 
     private static String sanitize(String raw) {

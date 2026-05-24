@@ -301,9 +301,27 @@ public final class AuthServer {
             templates.put(name, readTemplateData(f, name));
         }
 
+        String defaultLang = portalCfg.getOrDefault("registration.default_lang", "es_MX");
+        List<String> supportedLangs = parseStringArray(portalCfg.getOrDefault("registration.supported_langs", ""));
+        I18nData i18nData = parseI18nData(templatesCfg);
+        if (supportedLangs.isEmpty()) {
+            supportedLangs = new ArrayList<>(i18nData.fieldsByLang().keySet());
+        }
+        if (supportedLangs.isEmpty()) {
+            supportedLangs = List.of(defaultLang);
+        }
+
         StringBuilder sb = new StringBuilder();
         sb.append("{");
         sb.append("\"selectedTemplate\":\"").append(escape(selectedTemplate)).append("\",");
+        sb.append("\"defaultLang\":\"").append(escape(defaultLang)).append("\",");
+        sb.append("\"supportedLangs\":[");
+        for (int i = 0; i < supportedLangs.size(); i++) {
+            if (i > 0) sb.append(",");
+            sb.append("\"").append(escape(supportedLangs.get(i))).append("\"");
+        }
+        sb.append("],");
+        sb.append("\"i18n\":").append(i18nData.toJson()).append(",");
         sb.append("\"templates\":{");
         boolean firstTemplate = true;
         for (Map.Entry<String, TemplateData> e : templates.entrySet()) {
@@ -394,6 +412,39 @@ public final class AuthServer {
             out.add(m.group(1));
         }
         return out;
+    }
+
+    private static I18nData parseI18nData(Map<String, String> templatesCfg) {
+        Map<String, Map<String, Map<String, String>>> fieldsByLang = new LinkedHashMap<>();
+        Map<String, Map<String, String>> messagesByLang = new LinkedHashMap<>();
+
+        for (Map.Entry<String, String> e : templatesCfg.entrySet()) {
+            String key = e.getKey();
+            if (!key.startsWith("i18n.")) {
+                continue;
+            }
+            String[] parts = key.split("\\.");
+            if (parts.length < 4) {
+                continue;
+            }
+            String lang = parts[1];
+            if ("fields".equals(parts[2]) && parts.length >= 5) {
+                String field = parts[3];
+                String prop = parts[4];
+                fieldsByLang
+                        .computeIfAbsent(lang, ignored -> new LinkedHashMap<>())
+                        .computeIfAbsent(field, ignored -> new LinkedHashMap<>())
+                        .put(prop, e.getValue());
+                continue;
+            }
+            if ("messages".equals(parts[2]) && parts.length >= 4) {
+                String msgKey = parts[3];
+                messagesByLang
+                        .computeIfAbsent(lang, ignored -> new LinkedHashMap<>())
+                        .put(msgKey, e.getValue());
+            }
+        }
+        return new I18nData(fieldsByLang, messagesByLang);
     }
 
     private static String parseKeyInSection(String toml, String section, String key) {
@@ -538,6 +589,60 @@ public final class AuthServer {
     }
 
     private record PortalBootstrap(String json, Set<String> templates, String selectedTemplate) {
+    }
+
+    private record I18nData(
+            Map<String, Map<String, Map<String, String>>> fieldsByLang,
+            Map<String, Map<String, String>> messagesByLang
+    ) {
+        String toJson() {
+            StringBuilder sb = new StringBuilder();
+            sb.append("{");
+
+            sb.append("\"fields\":{");
+            boolean firstLang = true;
+            for (Map.Entry<String, Map<String, Map<String, String>>> langEntry : fieldsByLang.entrySet()) {
+                if (!firstLang) sb.append(",");
+                firstLang = false;
+                sb.append("\"").append(escape(langEntry.getKey())).append("\":{");
+                boolean firstField = true;
+                for (Map.Entry<String, Map<String, String>> fieldEntry : langEntry.getValue().entrySet()) {
+                    if (!firstField) sb.append(",");
+                    firstField = false;
+                    sb.append("\"").append(escape(fieldEntry.getKey())).append("\":{");
+                    boolean firstProp = true;
+                    for (Map.Entry<String, String> propEntry : fieldEntry.getValue().entrySet()) {
+                        if (!firstProp) sb.append(",");
+                        firstProp = false;
+                        sb.append("\"").append(escape(propEntry.getKey())).append("\":\"")
+                                .append(escape(propEntry.getValue())).append("\"");
+                    }
+                    sb.append("}");
+                }
+                sb.append("}");
+            }
+            sb.append("},");
+
+            sb.append("\"messages\":{");
+            firstLang = true;
+            for (Map.Entry<String, Map<String, String>> langEntry : messagesByLang.entrySet()) {
+                if (!firstLang) sb.append(",");
+                firstLang = false;
+                sb.append("\"").append(escape(langEntry.getKey())).append("\":{");
+                boolean firstMsg = true;
+                for (Map.Entry<String, String> msgEntry : langEntry.getValue().entrySet()) {
+                    if (!firstMsg) sb.append(",");
+                    firstMsg = false;
+                    sb.append("\"").append(escape(msgEntry.getKey())).append("\":\"")
+                            .append(escape(msgEntry.getValue())).append("\"");
+                }
+                sb.append("}");
+            }
+            sb.append("}");
+
+            sb.append("}");
+            return sb.toString();
+        }
     }
 
     private record ConfigSelection(Path path, String source, String reason) {

@@ -18,8 +18,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.logging.Logger;
 
 public final class AuthHttpHandler implements HttpHandler {
+    private static final Logger LOGGER = Logger.getLogger(AuthHttpHandler.class.getName());
     private final RegisterUserUseCase registerUserUseCase;
     private final LoginUseCase loginUseCase;
     private final IssuePasswordUseCase issuePasswordUseCase;
@@ -156,7 +158,7 @@ public final class AuthHttpHandler implements HttpHandler {
                 json.get("email"),
                 json.get("phone"),
                 json.get("mobile"),
-                json.get("address"),
+                firstNonBlank(json.get("address"), json.get("room")),
                 json.get("socialFacebook"),
                 json.get("socialInstagram"),
                 json.get("socialTiktok"),
@@ -173,9 +175,14 @@ public final class AuthHttpHandler implements HttpHandler {
             writeJson(exchange, 200, "{\"active\":false,\"remainingSeconds\":0}");
             return;
         }
-        AuthService.AccessState state = authService.accessStateByDeviceIp(ip);
-        writeJson(exchange, 200, "{\"active\":" + state.active() + ",\"remainingSeconds\":" + state.remainingSeconds() +
-                ",\"userId\":\"" + safe(state.userId()) + "\"}");
+        try {
+            AuthService.AccessState state = authService.accessStateByDeviceIp(ip);
+            writeJson(exchange, 200, "{\"active\":" + state.active() + ",\"remainingSeconds\":" + state.remainingSeconds() +
+                    ",\"userId\":\"" + safe(state.userId()) + "\"}");
+        } catch (RuntimeException e) {
+            LOGGER.warning("access_state_failed ip=" + ip + " error=" + safe(e.getMessage()));
+            writeJson(exchange, 200, "{\"active\":false,\"remainingSeconds\":0}");
+        }
     }
 
     private void login(HttpExchange exchange) throws IOException {
@@ -265,6 +272,18 @@ public final class AuthHttpHandler implements HttpHandler {
         String v = exchange.getRequestHeaders().getFirst(name);
         if (v == null || v.isBlank()) return null;
         return v.trim();
+    }
+
+    private static String firstNonBlank(String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (String v : values) {
+            if (v != null && !v.isBlank()) {
+                return v.trim();
+            }
+        }
+        return null;
     }
 
     private static void requirePolicyConsent(HttpExchange exchange) {

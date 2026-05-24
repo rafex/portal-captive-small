@@ -2,28 +2,24 @@ const REDIRECT_URL = 'https://theworldofrafex.blog';
 const DEVICE_UUID_KEY = 'portal_device_uuid';
 const COOKIE_CONSENT_KEY = 'portal_cookie_consent';
 
-const I18N = {
-  es: {
-    loginTitle: 'Iniciar sesión',
-    registerTitle: 'Registro',
-    continueTitle: 'Acceso vigente',
-    loginBtn: 'Entrar',
-    registerBtn: 'Registrarme',
-    continueBtn: 'Continuar',
-    identifier: 'Correo o teléfono',
-    password: 'Contraseña',
-    acceptTerms: 'Acepto términos y condiciones',
-    policyTitle: 'Términos, privacidad y uso',
-    policyAccept: 'Aceptar y continuar',
-    policyReject: 'Rechazar',
-    cookiesTitle: 'Preferencias de cookies',
-    cookiesAccept: 'Aceptar cookies',
-    cookiesReject: 'Rechazar cookies',
-    denied: 'Sin aceptación de cookies y términos no se habilita acceso a navegación.',
-    activeFmt: (sec) => `Tu registro sigue vigente por ${formatDuration(sec)}.`,
-    statusReady: 'Completa el formulario para continuar.',
-    statusLoggedIn: 'Autenticado correctamente. Redirigiendo...'
-  }
+const UI_FALLBACK = {
+  loginTitle: 'Iniciar sesión',
+  registerTitle: 'Registro',
+  continueTitle: 'Acceso vigente',
+  loginBtn: 'Entrar',
+  registerBtn: 'Registrarme',
+  continueBtn: 'Continuar',
+  identifier: 'Correo o teléfono',
+  password: 'Contraseña',
+  acceptTerms: 'Acepto términos y condiciones',
+  policyTitle: 'Términos, privacidad y uso',
+  policyAccept: 'Aceptar y continuar',
+  policyReject: 'Rechazar',
+  cookiesTitle: 'Preferencias de cookies',
+  cookiesAccept: 'Aceptar cookies',
+  cookiesReject: 'Rechazar cookies',
+  denied: 'Sin aceptación de cookies y términos no se habilita acceso a navegación.',
+  statusLoggedIn: 'Autenticado correctamente. Redirigiendo...'
 };
 
 const MIT_LICENSE = `MIT License\n\nCopyright (c) 2026 Portal Captive Small contributors\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.`;
@@ -58,9 +54,25 @@ function getOrCreateDeviceUuid() {
 }
 
 async function sha256hex(input) {
-  const enc = new TextEncoder().encode(input);
-  const digest = await crypto.subtle.digest('SHA-256', enc);
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  if (globalThis.crypto?.subtle?.digest) {
+    const enc = new TextEncoder().encode(input);
+    const digest = await globalThis.crypto.subtle.digest('SHA-256', enc);
+    return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  // Fallback para HTTP no seguro: hash determinista (no criptográfico).
+  let h1 = 0x811c9dc5;
+  let h2 = 0x01000193;
+  for (let i = 0; i < input.length; i += 1) {
+    const c = input.charCodeAt(i);
+    h1 ^= c;
+    h1 = Math.imul(h1, 0x01000193);
+    h2 ^= (c << (i % 8));
+    h2 = Math.imul(h2, 0x45d9f3b);
+  }
+  const p1 = (h1 >>> 0).toString(16).padStart(8, '0');
+  const p2 = (h2 >>> 0).toString(16).padStart(8, '0');
+  return `${p1}${p2}${p1}${p2}`;
 }
 
 async function computeDeviceFingerprint() {
@@ -87,7 +99,7 @@ function requiresAuth(template) {
   return hasPassword && hasIdentifier;
 }
 
-function labelsFor(field) {
+function labelsFor(bootstrap, lang, field) {
   const map = {
     name: 'Nombre',
     lastname: 'Apellidos',
@@ -101,7 +113,7 @@ function labelsFor(field) {
     social: 'Red social',
     terms: 'Acepto términos y condiciones'
   };
-  return map[field] || field;
+  return fieldI18n(bootstrap, lang, field, 'label', map[field] || field);
 }
 
 function inputType(field) {
@@ -115,16 +127,40 @@ function mapFieldToPayload(field, value) {
   const v = value?.trim?.() ?? value;
   if (field === 'name') return ['firstName', v];
   if (field === 'lastname') return ['lastName', v];
+  if (field === 'room') return ['address', v];
   if (field === 'social') return ['socialInstagram', v];
   return [field, v];
 }
 
 function parseBootstrap() {
-  return globalThis.__PORTAL_CONFIG__ || { selectedTemplate: 'hotel', templates: {} };
+  return globalThis.__PORTAL_CONFIG__ || { selectedTemplate: 'hotel', templates: {}, i18n: { fields: {}, messages: {} } };
 }
 
 function templateList(bootstrap) {
   return Object.keys(bootstrap.templates || {}).sort();
+}
+
+function resolveLang(bootstrap) {
+  const preferred = (navigator.language || '').replace('-', '_');
+  const supported = bootstrap.supportedLangs || [];
+  if (supported.includes(preferred)) return preferred;
+  const short = preferred.split('_')[0];
+  const byPrefix = supported.find((x) => x.toLowerCase().startsWith(short.toLowerCase()));
+  if (byPrefix) return byPrefix;
+  if (bootstrap.defaultLang) return bootstrap.defaultLang;
+  return supported[0] || 'es_MX';
+}
+
+function uiText(bootstrap, lang, key) {
+  const messages = bootstrap?.i18n?.messages?.[lang] || {};
+  if (key === 'loginBtn' && messages.login_button) return messages.login_button;
+  if (key === 'continueTitle' && messages.welcome) return messages.welcome;
+  return UI_FALLBACK[key] || key;
+}
+
+function fieldI18n(bootstrap, lang, field, prop, fallback) {
+  const fields = bootstrap?.i18n?.fields?.[lang] || {};
+  return fields?.[field]?.[prop] || fallback;
 }
 
 function setStatus(root, text, isError = false) {
@@ -151,26 +187,26 @@ function policyText(templates) {
     `Si rechazas cookies o términos, no se habilita navegación.\n\n${MIT_LICENSE}`;
 }
 
-function renderConsentModals(root, templates) {
+function renderConsentModals(root, templates, texts) {
   const policy = policyText(templates);
   root.insertAdjacentHTML('beforeend', `
     <div id="cookie-modal" class="portal-modal-backdrop" hidden>
       <div class="portal-modal">
-        <h3>Preferencias de cookies</h3>
+        <h3>${escapeHtml(texts.cookiesTitle)}</h3>
         <p>Usamos cookies/localStorage para sesión del portal cautivo, consentimiento y continuidad de acceso.</p>
         <div class="portal-actions">
-          <button id="cookie-accept" type="button">Aceptar cookies</button>
-          <button id="cookie-reject" type="button" class="secondary" style="color:#111">Rechazar cookies</button>
+          <button id="cookie-accept" type="button">${escapeHtml(texts.cookiesAccept)}</button>
+          <button id="cookie-reject" type="button" class="secondary" style="color:#111">${escapeHtml(texts.cookiesReject)}</button>
         </div>
       </div>
     </div>
     <div id="policy-modal" class="portal-modal-backdrop" hidden>
       <div class="portal-modal">
-        <h3>Términos, privacidad y uso</h3>
+        <h3>${escapeHtml(texts.policyTitle)}</h3>
         <pre class="portal-policy">${escapeHtml(policy)}</pre>
         <div class="portal-actions">
-          <button id="policy-accept" type="button">Aceptar y continuar</button>
-          <button id="policy-reject" type="button" class="secondary" style="color:#111">Rechazar</button>
+          <button id="policy-accept" type="button">${escapeHtml(texts.policyAccept)}</button>
+          <button id="policy-reject" type="button" class="secondary" style="color:#111">${escapeHtml(texts.policyReject)}</button>
         </div>
       </div>
     </div>
@@ -246,24 +282,24 @@ function renderShell(root, template) {
   `;
 }
 
-function renderContinue(panel, remainingSeconds) {
+function renderContinue(panel, remainingSeconds, texts) {
   panel.innerHTML = `
-    <h2>Acceso vigente</h2>
+    <h2>${escapeHtml(texts.continueTitle)}</h2>
     <p>Tu registro sigue vigente por ${formatDuration(remainingSeconds)}.</p>
-    <button id="continue-btn" type="button">Continuar</button>
+    <button id="continue-btn" type="button">${escapeHtml(texts.continueBtn)}</button>
   `;
   panel.querySelector('#continue-btn').onclick = () => {
     location.href = REDIRECT_URL;
   };
 }
 
-function renderLogin(panel) {
+function renderLogin(panel, texts) {
   panel.innerHTML = `
-    <h2>Iniciar sesión</h2>
+    <h2>${escapeHtml(texts.loginTitle)}</h2>
     <form id="login-form">
-      <input name="identifier" placeholder="Correo o teléfono" required />
-      <input type="password" name="password" placeholder="Contraseña" required />
-      <button type="submit">Entrar</button>
+      <input name="identifier" placeholder="${escapeHtml(texts.identifier)}" required />
+      <input type="password" name="password" placeholder="${escapeHtml(texts.password)}" required />
+      <button type="submit">${escapeHtml(texts.loginBtn)}</button>
     </form>
     <p style="margin:.75rem 0 0 0">
       ¿Usuario nuevo?
@@ -272,16 +308,16 @@ function renderLogin(panel) {
   `;
 }
 
-function renderRegister(panel, template) {
+function renderRegister(panel, template, bootstrap, lang, texts) {
   const rows = (template?.fields || [])
     .filter((f) => f.field !== 'terms')
     .map((f) => `
-      <label>${escapeHtml(labelsFor(f.field))}
+      <label>${escapeHtml(labelsFor(bootstrap, lang, f.field))}
         <input
           name="${escapeHtml(f.field)}"
           type="${escapeHtml(inputType(f.field))}"
           ${f.mode === 'required' ? 'required' : ''}
-          placeholder="${escapeHtml(labelsFor(f.field))}"
+          placeholder="${escapeHtml(fieldI18n(bootstrap, lang, f.field, 'placeholder', labelsFor(bootstrap, lang, f.field)))}"
         />
       </label>
     `)
@@ -289,14 +325,14 @@ function renderRegister(panel, template) {
 
   const termsRequired = (template?.fields || []).some((f) => f.field === 'terms' && f.mode === 'required');
   panel.innerHTML = `
-    <h2>Registro</h2>
+    <h2>${escapeHtml(texts.registerTitle)}</h2>
     <form id="register-form">
       ${rows}
       <label>
         <input name="terms" type="checkbox" ${termsRequired ? 'required' : ''} />
-        Acepto términos y condiciones
+        ${escapeHtml(texts.acceptTerms)}
       </label>
-      <button type="submit">Registrarme</button>
+      <button type="submit">${escapeHtml(texts.registerBtn)}</button>
     </form>
   `;
 }
@@ -317,15 +353,35 @@ export async function mountPortal(root, opts = {}) {
   const apiBaseUrl = opts.apiBaseUrl || '';
   const bootstrap = parseBootstrap();
   const template = bootstrap.templates?.[bootstrap.selectedTemplate] || Object.values(bootstrap.templates || {})[0] || {};
+  const lang = resolveLang(bootstrap);
+  const texts = {
+    loginTitle: uiText(bootstrap, lang, 'loginTitle'),
+    registerTitle: uiText(bootstrap, lang, 'registerTitle'),
+    continueTitle: uiText(bootstrap, lang, 'continueTitle'),
+    loginBtn: uiText(bootstrap, lang, 'loginBtn'),
+    registerBtn: uiText(bootstrap, lang, 'registerBtn'),
+    continueBtn: uiText(bootstrap, lang, 'continueBtn'),
+    identifier: uiText(bootstrap, lang, 'identifier'),
+    password: uiText(bootstrap, lang, 'password'),
+    acceptTerms: uiText(bootstrap, lang, 'acceptTerms'),
+    policyTitle: uiText(bootstrap, lang, 'policyTitle'),
+    policyAccept: uiText(bootstrap, lang, 'policyAccept'),
+    policyReject: uiText(bootstrap, lang, 'policyReject'),
+    cookiesTitle: uiText(bootstrap, lang, 'cookiesTitle'),
+    cookiesAccept: uiText(bootstrap, lang, 'cookiesAccept'),
+    cookiesReject: uiText(bootstrap, lang, 'cookiesReject'),
+    denied: uiText(bootstrap, lang, 'denied'),
+    statusLoggedIn: uiText(bootstrap, lang, 'statusLoggedIn')
+  };
 
   root.classList.add('portal-app');
   applyTheme(root, template);
   renderShell(root, template);
-  renderConsentModals(root, templateList(bootstrap));
+  renderConsentModals(root, templateList(bootstrap), texts);
 
   const consented = await ensureConsent(root);
   if (!consented) {
-    setStatus(root, 'Sin aceptación de cookies y términos no se habilita acceso a navegación.', true);
+    setStatus(root, texts.denied, true);
     const panel = root.querySelector('#panel');
     panel.innerHTML = '<section><p>Acceso denegado por política de consentimiento.</p></section>';
     return;
@@ -351,7 +407,7 @@ export async function mountPortal(root, opts = {}) {
     try {
       const state = await fetchJson(`${apiBaseUrl}/auth/access/state`, { method: 'GET' });
       if (state.active) {
-        renderContinue(panel, state.remainingSeconds || 0);
+        renderContinue(panel, state.remainingSeconds || 0, texts);
         return;
       }
     } catch (_) {
@@ -360,10 +416,10 @@ export async function mountPortal(root, opts = {}) {
   }
 
   if (authNeeded) {
-    renderLogin(panel);
+    renderLogin(panel, texts);
     panel.querySelector('#go-register')?.addEventListener('click', (ev) => {
       ev.preventDefault();
-      renderRegister(panel, template);
+      renderRegister(panel, template, bootstrap, lang, texts);
       wireRegisterForm(panel, root, template, bootstrap, apiBaseUrl, headers);
     });
     panel.querySelector('#login-form').addEventListener('submit', async (ev) => {
@@ -379,7 +435,7 @@ export async function mountPortal(root, opts = {}) {
             password: String(form.get('password') || '')
           })
         });
-        setStatus(root, 'Autenticado correctamente. Redirigiendo...');
+        setStatus(root, texts.statusLoggedIn);
         location.href = REDIRECT_URL;
       } catch (e) {
         setStatus(root, `Error: ${e.message}`, true);
@@ -388,7 +444,7 @@ export async function mountPortal(root, opts = {}) {
     return;
   }
 
-  renderRegister(panel, template);
+  renderRegister(panel, template, bootstrap, lang, texts);
   wireRegisterForm(panel, root, template, bootstrap, apiBaseUrl, headers);
 }
 

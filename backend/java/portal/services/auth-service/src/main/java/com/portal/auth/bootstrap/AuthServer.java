@@ -8,10 +8,12 @@ import com.portal.auth.adapter.out.network.SshOpenWrtAccessGateway;
 import com.portal.auth.adapter.out.notifications.MosquittoAsyncPublisher;
 import com.portal.auth.adapter.out.notifications.Sha256PasswordHasher;
 import com.portal.auth.adapter.out.notifications.SmtpSocketEmailSender;
+import com.portal.auth.adapter.out.sqlite.AdminSqliteCliRepository;
 import com.portal.auth.adapter.out.sqlite.SqliteCliUserRepository;
 import com.portal.auth.application.port.out.AsyncEventPublisher;
 import com.portal.auth.application.port.out.OpenWrtAccessGateway;
 import com.portal.auth.application.port.out.UserRepository;
+import com.portal.auth.application.service.AdminSessionService;
 import com.portal.auth.application.service.AuthService;
 import com.portal.auth.application.service.RegistrationTemplatePolicy;
 import com.portal.auth.config.PortalConfig;
@@ -85,6 +87,8 @@ public final class AuthServer {
         commandConsumer.start();
 
         Supplier<Boolean> dbMqttHealth = () -> !(repository instanceof MqttRustUserRepository r) || r.isHealthy();
+        AdminSqliteCliRepository adminRepository = new AdminSqliteCliRepository(config.sqliteDbPath());
+        AdminSessionService adminSessionService = new AdminSessionService(8 * 3600);
         PortalBootstrap bootstrap = buildPortalBootstrap(activeConfigPath, config.registrationTemplate());
         UiSelection uiSelection = selectUiSource();
         Supplier<String> portalIndexHtml = uiSelection.indexHtmlSupplier();
@@ -103,7 +107,9 @@ public final class AuthServer {
                 portalStylesCss,
                 portalAssetBytes,
                 bootstrap.json(),
-                bootstrap.templates()
+                bootstrap.templates(),
+                adminRepository,
+                adminSessionService
         ));
         httpServer.setExecutor(Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors()));
         httpServer.start();

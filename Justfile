@@ -130,3 +130,9 @@ docker-ps:
 # Para el stack y elimina volúmenes de datos (destructivo)
 docker-clean:
     bash scripts/docker/stack.sh clean
+
+# ── Admin portal/CLI ──────────────────────────────────────────────────────────
+
+# Crea o actualiza usuario admin/viewer en SQLite local
+admin-user-create username role="viewer" password db_path="data/auth-service.db":
+    DB_PATH={{db_path}} bash scripts/runtime/admin-user-create.sh {{username}} {{role}} {{password}}

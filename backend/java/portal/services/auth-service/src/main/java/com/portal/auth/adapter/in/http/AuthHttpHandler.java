@@ -1,12 +1,15 @@
 package com.portal.auth.adapter.in.http;
 
 import com.portal.auth.adapter.out.mqtt.DbMqttMetrics;
+import com.portal.auth.adapter.out.notifications.Sha256PasswordHasher;
+import com.portal.auth.adapter.out.sqlite.AdminSqliteCliRepository;
 import com.portal.auth.application.port.in.IssuePasswordUseCase;
 import com.portal.auth.application.port.in.LoginCommand;
 import com.portal.auth.application.port.in.LoginResult;
 import com.portal.auth.application.port.in.LoginUseCase;
 import com.portal.auth.application.port.in.RegisterUserCommand;
 import com.portal.auth.application.port.in.RegisterUserUseCase;
+import com.portal.auth.application.service.AdminSessionService;
 import com.portal.auth.application.service.AuthService;
 import com.portal.auth.shared.SimpleJson;
 import com.sun.net.httpserver.HttpExchange;
@@ -35,6 +38,9 @@ public final class AuthHttpHandler implements HttpHandler {
     private final String portalBootstrapJson;
     private final Set<String> allowedTemplates;
     private final AuthService authService;
+    private final AdminSqliteCliRepository adminRepository;
+    private final AdminSessionService adminSessionService;
+    private final Sha256PasswordHasher adminPasswordHasher;
 
     public AuthHttpHandler(RegisterUserUseCase registerUserUseCase,
                            LoginUseCase loginUseCase,
@@ -45,7 +51,9 @@ public final class AuthHttpHandler implements HttpHandler {
                            Supplier<String> portalStylesCssSupplier,
                            Function<String, byte[]> assetBytesSupplier,
                            String portalBootstrapJson,
-                           Set<String> allowedTemplates) {
+                           Set<String> allowedTemplates,
+                           AdminSqliteCliRepository adminRepository,
+                           AdminSessionService adminSessionService) {
         this.registerUserUseCase = registerUserUseCase;
         this.loginUseCase = loginUseCase;
         this.issuePasswordUseCase = issuePasswordUseCase;
@@ -57,6 +65,9 @@ public final class AuthHttpHandler implements HttpHandler {
         this.portalBootstrapJson = portalBootstrapJson;
         this.allowedTemplates = allowedTemplates;
         this.authService = registerUserUseCase instanceof AuthService s ? s : null;
+        this.adminRepository = adminRepository;
+        this.adminSessionService = adminSessionService;
+        this.adminPasswordHasher = new Sha256PasswordHasher();
     }
 
     @Override
@@ -138,6 +149,24 @@ public final class AuthHttpHandler implements HttpHandler {
                 issuePassword(exchange);
                 return;
             }
+            if ("/admin".equals(path) && "GET".equals(method)) {
+                writeText(exchange, 200, "text/html; charset=utf-8", renderAdminHtml());
+                return;
+            }
+            if ("/admin/login".equals(path) && "POST".equals(method)) {
+                adminLogin(exchange);
+                return;
+            }
+            if ("/admin/users".equals(path) && "POST".equals(method)) {
+                AdminSessionService.Session session = requireAdminSession(exchange, true);
+                adminCreateUser(exchange, session);
+                return;
+            }
+            if ("/admin/users/registered".equals(path) && "GET".equals(method)) {
+                requireAdminSession(exchange, false);
+                adminListRegistered(exchange);
+                return;
+            }
             writeJson(exchange, 404, "{\"error\":\"not_found\"}");
         } catch (IllegalArgumentException e) {
             LOGGER.info("http_request_failed rid=" + rid + " method=" + method + " path=" + path + " status=400 error=" + safe(e.getMessage()));
@@ -217,6 +246,76 @@ public final class AuthHttpHandler implements HttpHandler {
         writeJson(exchange, 202, "{\"status\":\"queued\"}");
     }
 
+    private void adminLogin(HttpExchange exchange) throws IOException {
+        String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+        Map<String, String> json = SimpleJson.parseFlatObject(body);
+        String username = normalize(json.get("username"));
+        String password = json.get("password");
+        if (isBlank(username) || isBlank(password)) {
+            throw new IllegalArgumentException("admin_credentials_required");
+        }
+        var userOpt = adminRepository.findByUsername(username);
+        if (userOpt.isEmpty()) {
+            writeJson(exchange, 401, "{\"error\":\"invalid_admin_credentials\"}");
+            return;
+        }
+        var user = userOpt.get();
+        if (!user.enabled()) {
+            writeJson(exchange, 403, "{\"error\":\"admin_user_disabled\"}");
+            return;
+        }
+        String actual = adminPasswordHasher.hash(password, user.passwordSalt());
+        if (!actual.equals(user.passwordHash())) {
+            writeJson(exchange, 401, "{\"error\":\"invalid_admin_credentials\"}");
+            return;
+        }
+        String token = adminSessionService.issue(user.username(), user.role());
+        writeJson(exchange, 200, "{\"token\":\"" + safe(token) + "\",\"role\":\"" + safe(user.role()) + "\"}");
+    }
+
+    private void adminCreateUser(HttpExchange exchange, AdminSessionService.Session session) throws IOException {
+        if (!session.isAdmin()) {
+            writeJson(exchange, 403, "{\"error\":\"admin_role_required\"}");
+            return;
+        }
+        String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+        Map<String, String> json = SimpleJson.parseFlatObject(body);
+        String username = normalize(json.get("username"));
+        String password = json.get("password");
+        String role = normalize(json.get("role"));
+        if (isBlank(username) || isBlank(password)) {
+            throw new IllegalArgumentException("admin_credentials_required");
+        }
+        if (!"admin".equals(role) && !"viewer".equals(role)) {
+            throw new IllegalArgumentException("invalid_admin_role");
+        }
+        String salt = adminPasswordHasher.salt();
+        String hash = adminPasswordHasher.hash(password, salt);
+        adminRepository.saveAdmin(username, hash, salt, role, true);
+        writeJson(exchange, 201, "{\"status\":\"ok\",\"username\":\"" + safe(username) + "\",\"role\":\"" + role + "\"}");
+    }
+
+    private void adminListRegistered(HttpExchange exchange) throws IOException {
+        String query = exchange.getRequestURI().getQuery();
+        int limit = parseLimit(query);
+        var rows = adminRepository.listRegisteredUsers(limit);
+        StringBuilder sb = new StringBuilder();
+        sb.append("{\"count\":").append(rows.size()).append(",\"users\":[");
+        boolean first = true;
+        for (var r : rows) {
+            if (!first) sb.append(",");
+            first = false;
+            sb.append("{");
+            sb.append("\"userId\":\"").append(safe(r.userId())).append("\",");
+            sb.append("\"createdAt\":\"").append(safe(r.createdAt())).append("\",");
+            sb.append("\"updatedAt\":\"").append(safe(r.updatedAt())).append("\",");
+            sb.append("\"profile\":").append((r.profileJson() == null || r.profileJson().isBlank()) ? "{}" : r.profileJson());
+            sb.append("}");
+        }
+        sb.append("]}");
+        writeJson(exchange, 200, sb.toString());
+    }
+
     private String renderPortalHtml() {
         return portalIndexHtmlSupplier.get().replace("__PORTAL_BOOTSTRAP_JSON__", portalBootstrapJson);
     }
@@ -227,6 +326,24 @@ public final class AuthHttpHandler implements HttpHandler {
                 "\"selectedTemplate\":\"" + templateOverride.replace("\"", "") + "\""
         );
         return portalIndexHtmlSupplier.get().replace("__PORTAL_BOOTSTRAP_JSON__", overridden);
+    }
+
+    private String renderAdminHtml() {
+        return """
+                <!doctype html>
+                <html lang="es">
+                  <head>
+                    <meta charset="UTF-8" />
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+                    <title>Portal Admin</title>
+                    <link rel="stylesheet" href="/assets/styles.css" />
+                  </head>
+                  <body>
+                    <div id="admin-app"></div>
+                    <script type="module" src="/assets/admin.js"></script>
+                  </body>
+                </html>
+                """;
     }
 
     private void serveStaticAsset(HttpExchange exchange, String path) throws IOException {
@@ -256,7 +373,7 @@ public final class AuthHttpHandler implements HttpHandler {
         exchange.getResponseHeaders().set("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
         exchange.getResponseHeaders().set(
                 "Access-Control-Allow-Headers",
-                "Content-Type,X-Terms-Accepted,X-Cookies-Accepted,X-Device-UUID,X-Device-Fingerprint,X-Device-UA,X-Forwarded-For"
+                "Content-Type,Authorization,X-Request-Id,X-Terms-Accepted,X-Cookies-Accepted,X-Device-UUID,X-Device-Fingerprint,X-Device-UA,X-Forwarded-For"
         );
     }
 
@@ -269,6 +386,54 @@ public final class AuthHttpHandler implements HttpHandler {
 
     private static String safe(String value) {
         return value == null ? "" : value;
+    }
+
+    private AdminSessionService.Session requireAdminSession(HttpExchange exchange, boolean requireEnabled) {
+        String token = bearerToken(exchange);
+        var sessionOpt = adminSessionService.resolve(token);
+        if (sessionOpt.isEmpty()) {
+            throw new IllegalArgumentException("admin_unauthorized");
+        }
+        var session = sessionOpt.get();
+        if (requireEnabled && !session.isAdmin() && !"viewer".equalsIgnoreCase(session.role())) {
+            throw new IllegalArgumentException("admin_forbidden");
+        }
+        return session;
+    }
+
+    private static String bearerToken(HttpExchange exchange) {
+        String auth = exchange.getRequestHeaders().getFirst("Authorization");
+        if (auth == null || auth.isBlank()) return null;
+        if (!auth.regionMatches(true, 0, "Bearer ", 0, 7)) return null;
+        return auth.substring(7).trim();
+    }
+
+    private static int parseLimit(String query) {
+        if (query == null || query.isBlank()) return 100;
+        for (String part : query.split("&")) {
+            int idx = part.indexOf('=');
+            if (idx <= 0) continue;
+            String k = part.substring(0, idx);
+            String v = part.substring(idx + 1);
+            if ("limit".equalsIgnoreCase(k)) {
+                try {
+                    return Integer.parseInt(v);
+                } catch (NumberFormatException ignored) {
+                    return 100;
+                }
+            }
+        }
+        return 100;
+    }
+
+    private static String normalize(String value) {
+        if (value == null) return null;
+        String v = value.trim().toLowerCase();
+        return v.isBlank() ? null : v;
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 
     private static String requestId(HttpExchange exchange) {

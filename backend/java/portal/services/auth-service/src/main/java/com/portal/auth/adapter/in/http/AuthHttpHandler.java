@@ -16,8 +16,10 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public final class AuthHttpHandler implements HttpHandler {
@@ -62,6 +64,7 @@ public final class AuthHttpHandler implements HttpHandler {
         addCors(exchange);
         String path = exchange.getRequestURI().getPath();
         String method = exchange.getRequestMethod();
+        String rid = requestId(exchange);
 
         if ("OPTIONS".equals(method)) {
             exchange.sendResponseHeaders(204, -1);
@@ -137,8 +140,19 @@ public final class AuthHttpHandler implements HttpHandler {
             }
             writeJson(exchange, 404, "{\"error\":\"not_found\"}");
         } catch (IllegalArgumentException e) {
+            LOGGER.info("http_request_failed rid=" + rid + " method=" + method + " path=" + path + " status=400 error=" + safe(e.getMessage()));
             writeJson(exchange, 400, "{\"error\":\"" + e.getMessage() + "\"}");
+        } catch (IllegalStateException e) {
+            String message = safe(e.getMessage());
+            if (message.contains("db_mqtt_rpc_exhausted") || message.contains("db_read_failed") || message.contains("db_write_failed")) {
+                LOGGER.log(Level.WARNING, "http_request_failed rid=" + rid + " method=" + method + " path=" + path + " status=503 error=db_unavailable", e);
+                writeJson(exchange, 503, "{\"error\":\"db_unavailable\"}");
+                return;
+            }
+            LOGGER.log(Level.SEVERE, "http_request_failed rid=" + rid + " method=" + method + " path=" + path + " status=500", e);
+            writeJson(exchange, 500, "{\"error\":\"internal_error\"}");
         } catch (Exception e) {
+            LOGGER.log(Level.SEVERE, "http_request_failed rid=" + rid + " method=" + method + " path=" + path + " status=500", e);
             writeJson(exchange, 500, "{\"error\":\"internal_error\"}");
         }
     }
@@ -255,6 +269,14 @@ public final class AuthHttpHandler implements HttpHandler {
 
     private static String safe(String value) {
         return value == null ? "" : value;
+    }
+
+    private static String requestId(HttpExchange exchange) {
+        String existing = exchange.getRequestHeaders().getFirst("X-Request-Id");
+        if (existing != null && !existing.isBlank()) {
+            return existing.trim();
+        }
+        return UUID.randomUUID().toString();
     }
 
     private static String remoteIp(HttpExchange exchange) {

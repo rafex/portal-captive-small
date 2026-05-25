@@ -1,0 +1,52 @@
+name: release-from-package
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (e.g. v0.2.5)"
+        required: true
+        type: string
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: read
+    steps:
+      - name: Resolve version
+        id: version
+        run: |
+          RAW="${{ github.event.inputs.version }}"
+          RAW="${RAW#refs/tags/}"
+          echo "raw=${RAW}" >> "$GITHUB_OUTPUT"
+          echo "plain=${RAW#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Install ORAS
+        run: |
+          ORAS_VERSION="1.2.0"
+          curl -fsSL "https://github.com/oras-project/oras/releases/download/v${ORAS_VERSION}/oras_${ORAS_VERSION}_linux_amd64.tar.gz" -o /tmp/oras.tgz
+          tar -xzf /tmp/oras.tgz -C /tmp oras
+          sudo mv /tmp/oras /usr/local/bin/oras
+          oras version
+
+      - name: Login GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | oras login ghcr.io -u "${{ github.repository_owner }}" --password-stdin
+
+      - name: Pull package bundles from GHCR
+        run: |
+          VERSION="${{ steps.version.outputs.plain }}"
+          mkdir -p dist/x86_64 dist/arm64 dist/release
+
+          oras pull "ghcr.io/${{ github.repository_owner }}/portal-captive-small-package:${VERSION}-x86_64" -o dist/x86_64
+          oras pull "ghcr.io/${{ github.repository_owner }}/portal-captive-small-package:${VERSION}-arm64" -o dist/arm64
+
+          tar -xzf "dist/x86_64/package-bundle-${VERSION}-x86_64.tar.gz" -C dist/release
+          tar -xzf "dist/arm64/package-bundle-${VERSION}-arm64.tar.gz" -C dist/release
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.raw }}
+          files: dist/release/*

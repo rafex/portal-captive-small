@@ -1,10 +1,15 @@
-name: build-and-release
+name: build-and-package
 
 on:
   push:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Tag version to package (e.g. v0.2.5). If empty, uses current ref."
+        required: false
+        type: string
 
 jobs:
   build-backend:
@@ -17,6 +22,9 @@ jobs:
           - arch: arm64
             runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -59,7 +67,12 @@ jobs:
 
       - name: Package backend artifacts (${{ matrix.arch }})
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF_NAME}"
+          fi
+          VERSION="${VERSION#v}"
           mkdir -p dist/package/backend/bin dist/package/backend/java dist/package/backend/config dist/package/scripts/runtime
           FAT_JAR="$(ls backend/java/portal/services/auth-service/target/auth-service-*.jar | head -n1)"
           cp backend/java/portal/services/auth-service/target/auth-service dist/package/backend/bin/auth-service-${{ matrix.arch }}
@@ -80,7 +93,12 @@ jobs:
       - name: Build LXC image artifact (arm64 only)
         if: matrix.arch == 'arm64'
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF_NAME}"
+          fi
+          VERSION="${VERSION#v}"
           IMG_DIR="dist/lxc-image/portal-captive"
           ROOTFS_DIR="${IMG_DIR}/rootfs"
 
@@ -108,33 +126,44 @@ jobs:
           (cd dist && sha256sum "lxc-image-${VERSION}-arm64.tar.gz" > "lxc-image-${VERSION}-arm64.tar.gz.sha256")
           rm -rf dist/lxc-image
 
-      - name: Upload backend artifacts (${{ matrix.arch }})
+      - name: Build package bundle (${{ matrix.arch }})
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF_NAME}"
+          fi
+          VERSION="${VERSION#v}"
+          tar -czf "dist/package-bundle-${VERSION}-${{ matrix.arch }}.tar.gz" -C dist .
+          (cd dist && sha256sum "package-bundle-${VERSION}-${{ matrix.arch }}.tar.gz" > "package-bundle-${VERSION}-${{ matrix.arch }}.tar.gz.sha256")
+
+      - name: Install ORAS
+        run: |
+          ORAS_VERSION="1.2.0"
+          curl -fsSL "https://github.com/oras-project/oras/releases/download/v${ORAS_VERSION}/oras_${ORAS_VERSION}_linux_amd64.tar.gz" -o /tmp/oras.tgz
+          tar -xzf /tmp/oras.tgz -C /tmp oras
+          sudo mv /tmp/oras /usr/local/bin/oras
+          oras version
+
+      - name: Login GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | oras login ghcr.io -u "${{ github.repository_owner }}" --password-stdin
+
+      - name: Publish bundle to GitHub Packages (GHCR) (${{ matrix.arch }})
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF_NAME}"
+          fi
+          VERSION="${VERSION#v}"
+          REF="ghcr.io/${{ github.repository_owner }}/portal-captive-small-package:${VERSION}-${{ matrix.arch }}"
+          oras push "${REF}" \
+            --artifact-type application/vnd.portal-captive.package.v1 \
+            "dist/package-bundle-${VERSION}-${{ matrix.arch }}.tar.gz:application/gzip" \
+            "dist/package-bundle-${VERSION}-${{ matrix.arch }}.tar.gz.sha256:text/plain"
+
+      - name: Upload backend artifacts (${{ matrix.arch }}) (debug/fallback)
         uses: actions/upload-artifact@v4
         with:
-          name: backend-release-artifacts-${{ matrix.arch }}
+          name: backend-package-artifacts-${{ matrix.arch }}
           path: dist/*
-
-  release:
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs:
-      - build-backend
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Download backend artifacts (x86_64)
-        uses: actions/download-artifact@v4
-        with:
-          name: backend-release-artifacts-x86_64
-          path: dist
-
-      - name: Download backend artifacts (arm64)
-        uses: actions/download-artifact@v4
-        with:
-          name: backend-release-artifacts-arm64
-          path: dist
-
-      - name: Create GitHub release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: dist/*

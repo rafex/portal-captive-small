@@ -137,6 +137,14 @@ docker-clean:
 admin-user-create username password role="viewer" db_path="data/auth-service.db":
     DB_PATH={{db_path}} bash scripts/runtime/admin-user-create.sh {{username}} {{role}} {{password}}
 
+# Crea/actualiza admin en bastion remoto por SSH (en el host, usando sqlite local del repo remoto)
+admin-user-create-remote username password host role="viewer" repo_path="/opt/repository/github/portal-captive-small" db_path="data/auth-service.db":
+    ssh {{host}} "cd {{repo_path}} && DB_PATH={{db_path}} bash scripts/runtime/admin-user-create.sh {{username}} {{role}} {{password}}"
+
+# Crea/actualiza admin dentro del contenedor auth-service en bastion remoto
+admin-user-create-remote-container username password host role="viewer" repo_path="/opt/repository/github/portal-captive-small" container="portal-auth" db_path="/app/data/auth-service.db":
+    ssh {{host}} "cd {{repo_path}} && podman exec -i {{container}} sh -lc 'DB_PATH={{db_path}} bash /app/scripts/runtime/admin-user-create.sh {{username}} {{role}} {{password}}'"
+
 # Genera llave + certificado autofirmado para firma JWT (RS256/ES256)
 jwt-selfsigned out_dir="security/jwt" cn="portal-captive-jwt" days="3650" alg="rsa":
     OUT_DIR={{out_dir}} CN={{cn}} DAYS={{days}} ALG={{alg}} bash scripts/security/generate-jwt-selfsigned.sh

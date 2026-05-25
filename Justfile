@@ -134,7 +134,7 @@ docker-clean:
 # ── Admin portal/CLI ──────────────────────────────────────────────────────────
 
 # Crea o actualiza usuario admin/viewer en SQLite local
-admin-user-create username role="viewer" password db_path="data/auth-service.db":
+admin-user-create username password role="viewer" db_path="data/auth-service.db":
     DB_PATH={{db_path}} bash scripts/runtime/admin-user-create.sh {{username}} {{role}} {{password}}
 
 # Genera llave + certificado autofirmado para firma JWT (RS256/ES256)

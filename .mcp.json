@@ -2,7 +2,17 @@
   "mcpServers": {
     "specnative": {
       "command": "asn-mcp",
-      "args": ["--repo", "."]
+      "args": [
+        "--repo",
+        "."
+      ]
+    },
+    "asn-agent": {
+      "command": "asn-agent-mcp",
+      "args": [
+        "--repo",
+        "."
+      ]
     }
   }
 }

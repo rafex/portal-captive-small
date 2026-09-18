@@ -8,3 +8,10 @@ cwd = "."
 startup_timeout_sec = 30
 tool_timeout_sec = 120
 default_tools_approval_mode = "writes"
+[mcp_servers.asn-agent]
+command = "asn-agent-mcp"
+args = ["--repo", "."]
+cwd = "."
+startup_timeout_sec = 30
+tool_timeout_sec = 120
+default_tools_approval_mode = "writes"

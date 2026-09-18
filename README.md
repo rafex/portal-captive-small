@@ -55,8 +55,10 @@ sudo bash scripts/install/rpi3b-direct-install.sh v0.1.0
 
 Las skills del proyecto están disponibles para Codex, Claude Code y OpenCode.
 El proyecto no necesita una receta `asn` ni un `Justfile` para usar SpecNative:
-instala ASN con `make install` en el repositorio del agente y abre el cliente
-desde este repositorio. El cliente usará `asn-mcp --repo .` como backend.
+instala ASN con `make install` en el repositorio del agente y, si integras otro
+proyecto, ejecuta `asn setup --repo . --clients all`. Abre el cliente desde
+este repositorio: usará `asn-agent-mcp --repo .` como agente y `asn-mcp --repo
+.` para diagnóstico.
 
 ## Artefactos esperados
 - `dist/frontend-<version>.tar.gz`

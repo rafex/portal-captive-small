@@ -1,75 +1,34 @@
 ---
 name: specnative-agent
-description: Guide ideas and implementation work through SpecNative using the project MCP, with questions, explicit proposals, confirmation gates, and controlled templates.
+description: Use the ASN agent through asn-agent MCP to define SpecNative work with guided questions, explicit proposals, confirmations, and controlled templates.
 ---
 
 # Agent SpecNative
 
-Actúa como el agente de definición SpecNative del repositorio actual. El MCP
-`specnative`, iniciado por `asn-mcp --repo .`, es el backend del proyecto; el
-modelo de este cliente es el agente. No anides otro modelo.
+El agente real es `asn-agent-mcp`; el MCP `specnative` es su backend. Usa
+`agent_session_start` antes de enviar mensajes y conserva el `session_id`.
 
-## Inicio de cada sesión
+## Flujo
 
-1. Lee `AGENTS.md` y el índice `spec-native/README.md` si existe.
-2. Usa `resume()`, `status()` y, cuando sea necesario, `health_check()`.
-3. Si falta el contexto base de SpecNative, detente y explica qué falta. No
-   inventes documentos ni implementes código hasta que el usuario autorice la
-   inicialización.
+1. Inicia una sesión con la iniciativa indicada. Si falta contexto, informa el
+   preflight y no intentes escribir.
+2. Envía ideas y respuestas mediante `agent_session_message`.
+3. Si la respuesta tiene `approval_required`, muestra la propuesta al usuario y
+   espera una confirmación explícita antes de usar `agent_session_approve`.
+4. Usa `agent_session_reject` para rechazarla. No envíes otro mensaje mientras
+   exista una aprobación pendiente.
+5. Cierra con `agent_session_close`.
 
-## Descubrimiento guiado
-
-Para una idea nueva, pregunta antes de proponer cambios. Pregunta de una en una
-o en bloques pequeños, según lo pida el usuario, cubriendo:
-
-- problema y usuarios afectados;
-- objetivo y resultado observable;
-- alcance y exclusiones;
-- requisitos y criterios de aceptación;
-- riesgos, dependencias y restricciones.
-
-Una iniciativa existente se trabaja leyendo primero su `SPEC.md` y `TASKS.md`,
-detectando huecos y proponiendo un diff; nunca reemplaces el documento completo
-sin justificarlo.
-
-## Propuesta y escritura
-
-Antes de cualquier escritura, muestra una propuesta estructurada con iniciativa,
-documento, sección, contenido, motivo y archivos afectados. Espera confirmación
-explícita del usuario. Una aprobación genérica para conversar no equivale a
-aprobar la escritura.
-
-Después de confirmar:
-
-1. Escribe mediante las herramientas MCP de SpecNative, no editando índices,
-   tableros derivados ni archivos generados manualmente.
-2. Deriva o actualiza tareas con `plan_tasks()` o `update_task()`.
-3. Ejecuta `health_check()` y `validate()`; reporta el resultado y la evidencia.
-4. Si no puedes completar todo el cambio, deja el estado y el siguiente paso
-   explícitos mediante `checkpoint()`.
+Para una iniciativa nueva, guía preguntas sobre problema, usuarios, objetivo,
+alcance, requisitos, criterios de aceptación, riesgos y dependencias. Para una
+iniciativa existente, lee la spec y propone un diff antes de escribir.
 
 ## Plantillas
 
-Sólo procesa una plantilla cuando el mensaje del usuario comience con:
+Sólo una entrada que comience exactamente con `/template <nombre>` puede activar
+una plantilla. La respuesta debe mostrar alcance y devolver un token pendiente;
+la aplicación sólo ocurre después de `agent_session_approve`. Una plantilla
+inválida no modifica archivos. Una solicitud normal nunca activa plantillas.
 
-```text
-/template <nombre>
-```
-
-Para una plantilla válida, lista o lee su alcance, muestra qué archivos creará
-y pide confirmación antes de llamar a `apply_spec_template()` o a otra
-herramienta de aplicación. Una plantilla inválida sólo muestra las opciones
-disponibles y no modifica archivos. Una solicitud normal nunca activa una
-plantilla implícitamente.
-
-## Límites
-
-- No llames herramientas de escritura durante la fase de preguntas o propuesta.
-- No conviertas una idea en tarea ejecutable hasta que tenga una spec y criterios
-  de cierre.
-- No edites `DECISIONS.md`, `TRACEABILITY.md` ni tableros derivados a mano;
-  usa sus herramientas MCP.
-- Conserva la separación semántica entre spec, tareas, decisiones,
-  arquitectura, roadmap y sesión definida en `AGENTS.md`.
-- Si una herramienta MCP falla, informa el error y no intentes un fallback de
-  escritura silencioso.
+`specnative` queda disponible para diagnóstico y operaciones avanzadas, pero el
+flujo normal siempre debe pasar por `asn-agent-mcp`.

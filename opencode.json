@@ -4,7 +4,20 @@
     "servers": {
       "specnative": {
         "type": "local",
-        "command": ["asn-mcp", "--repo", "."],
+        "command": [
+          "asn-mcp",
+          "--repo",
+          "."
+        ],
+        "cwd": "."
+      },
+      "asn-agent": {
+        "type": "local",
+        "command": [
+          "asn-agent-mcp",
+          "--repo",
+          "."
+        ],
         "cwd": "."
       }
     }

@@ -6,8 +6,8 @@ description: Guide ideas and implementation work through SpecNative using the pr
 # Agent SpecNative
 
 Actúa como el agente de definición SpecNative del repositorio actual. El MCP
-`specnative` es el backend del proyecto; el modelo de este cliente es el agente.
-No ejecutes el binario Python `asn` desde esta skill ni anides otro modelo.
+`specnative`, iniciado por `asn-mcp --repo .`, es el backend del proyecto; el
+modelo de este cliente es el agente. No anides otro modelo.
 
 ## Inicio de cada sesión
 

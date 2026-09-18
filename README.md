@@ -51,6 +51,13 @@ sudo bash scripts/install/rpi3b-direct-install.sh v0.1.0
 - `Makefile`: tareas atómicas de build y empaquetado.
 - `Justfile`: flujo de alto nivel y task manager.
 
+## SpecNative con skills
+
+Las skills del proyecto están disponibles para Codex, Claude Code y OpenCode.
+El proyecto no necesita una receta `asn` ni un `Justfile` para usar SpecNative:
+instala ASN con `make install` en el repositorio del agente y abre el cliente
+desde este repositorio. El cliente usará `asn-mcp --repo .` como backend.
+
 ## Artefactos esperados
 - `dist/frontend-<version>.tar.gz`
 - `dist/frontend-<version>.tar.gz.sha256`

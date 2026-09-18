@@ -148,3 +148,5 @@ admin-user-create-remote-container username password host role="viewer" repo_pat
 # Genera llave + certificado autofirmado para firma JWT (RS256/ES256)
 jwt-selfsigned out_dir="security/jwt" cn="portal-captive-jwt" days="3650" alg="rsa":
     OUT_DIR={{out_dir}} CN={{cn}} DAYS={{days}} ALG={{alg}} bash scripts/security/generate-jwt-selfsigned.sh
+
+import 'agent_spec_native.just'

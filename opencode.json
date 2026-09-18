@@ -1,0 +1,12 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "servers": {
+      "specnative": {
+        "type": "local",
+        "command": ["asn-mcp", "--repo", "."],
+        "cwd": "."
+      }
+    }
+  }
+}

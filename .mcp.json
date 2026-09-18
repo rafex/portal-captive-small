@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "specnative": {
+      "command": "asn-mcp",
+      "args": ["--repo", "."]
+    }
+  }
+}
